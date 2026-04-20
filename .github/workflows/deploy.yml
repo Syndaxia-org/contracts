@@ -81,6 +81,7 @@ jobs:
       - name: Build syndaxia-treasury
         run: |
           cd syndaxia-treasury
+          cargo generate-lockfile
           anchor build
           # Copy treasury .so into core's target so Anchor.toml [programs.localnet] resolves
           mkdir -p ../target/deploy
