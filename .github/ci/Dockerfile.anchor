@@ -1,0 +1,41 @@
+FROM ubuntu:22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG SOLANA_VERSION=1.18.26
+ARG ANCHOR_VERSION=0.32.0
+ARG NODE_MAJOR=20
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    git \
+    build-essential \
+    pkg-config \
+    libudev-dev \
+    libssl-dev \
+    llvm \
+    clang \
+    libclang-dev \
+    python3 \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js (used by anchor test scripts / npm ci)
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust stable toolchain
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install Solana CLI
+RUN sh -c "$(curl -sSfL https://release.anza.xyz/v${SOLANA_VERSION}/install)" \
+    && ln -s /root/.local/share/solana/install/active_release/bin/solana /usr/local/bin/solana \
+    && ln -s /root/.local/share/solana/install/active_release/bin/solana-keygen /usr/local/bin/solana-keygen
+
+# Install Anchor CLI once in the image
+RUN cargo install --git https://github.com/coral-xyz/anchor --tag v${ANCHOR_VERSION} anchor-cli
+
+RUN rustc --version && cargo --version && solana --version && anchor --version && node --version && npm --version
