@@ -74,8 +74,10 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
-      - name: Generate deployer keypair (test only)
-        run: solana-keygen new --no-bip39-passphrase -o ~/.config/solana/id.json
+      # Anchor needs a default keypair to launch the local test validator.
+      # This is a throwaway key — never funded, discarded after the job.
+      - name: Generate throwaway keypair for local test validator
+        run: solana-keygen new --no-bip39-passphrase --silent -o ~/.config/solana/id.json
 
       # Build treasury first (its .so is needed for core's test validator)
       - name: Build syndaxia-treasury
