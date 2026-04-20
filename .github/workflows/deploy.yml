@@ -219,23 +219,24 @@ jobs:
             $(solana address -k /tmp/treasury-keypair.json) \
             --new-upgrade-authority ${{ secrets.SQUADS_MULTISIG_VAULT }}
 
-      - name: Deploy Core (IMMUTABLE)
+      - name: Deploy Core (upgradeable initially)
         run: |
           solana program deploy \
             --program-id /tmp/core-keypair.json \
             --keypair /tmp/deployer.json \
             target/deploy/syndaxia_core.so
 
-          # Make IMMUTABLE immediately
+          # Transfer Core upgrade authority to Squads multisig
+          # This keeps the program upgradeable but only via N/M multisig approval
           solana program set-upgrade-authority \
             $(solana address -k /tmp/core-keypair.json) \
-            --final
+            --new-upgrade-authority ${{ secrets.SQUADS_MULTISIG_VAULT }}
 
       - name: Verify deployments
         run: |
-          echo "=== Core Program (should show: none as authority) ==="
+          echo "=== Core Program (should show: Squads vault as authority) ==="
           solana program show $(solana address -k /tmp/core-keypair.json)
-          echo "=== Treasury Program (should show: Squads vault) ==="
+          echo "=== Treasury Program (should show: Squads vault as authority) ==="
           solana program show $(solana address -k /tmp/treasury-keypair.json)
 
       - name: Cleanup secrets
