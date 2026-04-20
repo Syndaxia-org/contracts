@@ -27,7 +27,7 @@ jobs:
         with:
           repository: Syndaxia-org/syndaxia-treasury
           path: syndaxia-treasury
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.CI_TREASURY_PAT }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
