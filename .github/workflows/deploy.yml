@@ -11,7 +11,6 @@ env:
   SOLANA_VERSION: "1.18.26"
   RUST_TOOLCHAIN: "stable"
   NODE_VERSION: "20"
-  CI_IMAGE: ghcr.io/syndaxia-org/ci-anchor:latest
 
 jobs:
   # ─────────────────────────────────────────────
@@ -23,7 +22,7 @@ jobs:
       contents: read
       packages: read
     container:
-      image: ${{ env.CI_IMAGE }}
+      image: ghcr.io/syndaxia-org/ci-anchor:latest
     steps:
       - name: Checkout syndaxia-core
         uses: actions/checkout@v4
@@ -102,7 +101,7 @@ jobs:
       contents: read
       packages: read
     container:
-      image: ${{ env.CI_IMAGE }}
+      image: ghcr.io/syndaxia-org/ci-anchor:latest
     environment: devnet
     steps:
       - uses: actions/checkout@v4
@@ -168,7 +167,7 @@ jobs:
       contents: read
       packages: read
     container:
-      image: ${{ env.CI_IMAGE }}
+      image: ghcr.io/syndaxia-org/ci-anchor:latest
     environment: mainnet-production  # ← Requires manual approval
     steps:
       - uses: actions/checkout@v4
