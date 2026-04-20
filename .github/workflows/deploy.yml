@@ -11,6 +11,7 @@ env:
   SOLANA_VERSION: "1.18.26"
   RUST_TOOLCHAIN: "stable"
   NODE_VERSION: "20"
+  CI_IMAGE: ghcr.io/syndaxia-org/ci-anchor:latest
 
 jobs:
   # ─────────────────────────────────────────────
@@ -18,6 +19,11 @@ jobs:
   # ─────────────────────────────────────────────
   build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ env.CI_IMAGE }}
     steps:
       - name: Checkout syndaxia-core
         uses: actions/checkout@v4
@@ -28,14 +34,6 @@ jobs:
           repository: Syndaxia-org/syndaxia-treasury
           path: syndaxia-treasury
           token: ${{ secrets.CI_TREASURY_PAT }}
-
-      - name: Install system dependencies
-        run: sudo apt-get install -y libudev-dev pkg-config
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
 
       - name: Cache Rust dependencies
         uses: actions/cache@v4
@@ -48,28 +46,14 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      # Cache compiled anchor-cli binary — avoids ~8min recompile on every run
-      - name: Cache anchor-cli binary
-        id: cache-anchor
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/bin/anchor
-          key: ${{ runner.os }}-anchor-${{ env.ANCHOR_VERSION }}-rust-${{ env.RUST_TOOLCHAIN }}
-
-      - name: Install Solana CLI
+      - name: Check toolchain versions
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-
-      - name: Install Anchor CLI
-        if: steps.cache-anchor.outputs.cache-hit != 'true'
-        run: |
-          cargo install --git https://github.com/coral-xyz/anchor --tag v${{ env.ANCHOR_VERSION }} anchor-cli
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
+          rustc --version
+          cargo --version
+          solana --version
+          anchor --version
+          node --version
+          npm --version
 
       - name: Install JS dependencies
         run: npm ci
@@ -114,14 +98,14 @@ jobs:
     needs: build-and-test
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ env.CI_IMAGE }}
     environment: devnet
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Solana CLI
-        run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -180,14 +164,14 @@ jobs:
     needs: build-and-test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ env.CI_IMAGE }}
     environment: mainnet-production  # ← Requires manual approval
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Solana CLI
-        run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
