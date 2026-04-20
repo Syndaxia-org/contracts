@@ -27,9 +27,12 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust stable toolchain
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
-RUN rustup toolchain install stable && rustup default stable
+ENV CARGO_HOME=/root/.cargo
+ENV RUSTUP_HOME=/root/.rustup
+ENV PATH="${CARGO_HOME}/bin:${PATH}"
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
+    && rustup toolchain install stable \
+    && rustup default stable
 
 # Install Solana CLI
 RUN sh -c "$(curl -sSfL https://release.anza.xyz/v${SOLANA_VERSION}/install)" \
