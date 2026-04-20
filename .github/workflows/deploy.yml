@@ -9,7 +9,7 @@ on:
 env:
   ANCHOR_VERSION: "0.32.0"
   SOLANA_VERSION: "1.18.26"
-  RUST_TOOLCHAIN: "1.79.0"
+  RUST_TOOLCHAIN: "stable"
   NODE_VERSION: "20"
 
 jobs:
@@ -43,6 +43,15 @@ jobs:
             target/
             syndaxia-treasury/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      # Cache compiled anchor-cli binary — avoids ~8min recompile on every run
+      - name: Cache anchor-cli binary
+        id: cache-anchor
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/anchor
+          key: ${{ runner.os }}-anchor-${{ env.ANCHOR_VERSION }}-rust-${{ env.RUST_TOOLCHAIN }}
 
       - name: Install Solana CLI
         run: |
@@ -50,6 +59,7 @@ jobs:
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       - name: Install Anchor CLI
+        if: steps.cache-anchor.outputs.cache-hit != 'true'
         run: |
           cargo install --git https://github.com/coral-xyz/anchor --tag v${{ env.ANCHOR_VERSION }} anchor-cli
 
@@ -106,10 +116,6 @@ jobs:
         run: |
           sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-
-      - name: Install Anchor CLI
-        run: |
-          cargo install --git https://github.com/coral-xyz/anchor --tag v${{ env.ANCHOR_VERSION }} anchor-cli
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -176,10 +182,6 @@ jobs:
         run: |
           sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-
-      - name: Install Anchor CLI
-        run: |
-          cargo install --git https://github.com/coral-xyz/anchor --tag v${{ env.ANCHOR_VERSION }} anchor-cli
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
