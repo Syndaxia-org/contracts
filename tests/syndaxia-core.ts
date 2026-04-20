@@ -18,7 +18,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { SyndaxiaCore } from "../target/types/syndaxia_core";
-import { SyndaxiaTreasury } from "../target/types/syndaxia_treasury";
 import {
   createMint,
   createAccount,
@@ -41,16 +40,12 @@ describe("syndaxia-core (immutable)", () => {
   let feeCollectorTokenAccount: PublicKey;
   let validator: Keypair;
 
-  // Treasury accounts shared across all createDeal calls
-  let treasuryProgram: Program<SyndaxiaTreasury>;
-  let treasuryConfigPda: PublicKey;
-  let treasuryTokenAccount: PublicKey;
-
   const FEE_BPS = new anchor.BN(500); // 5%
   const DEAL_AMOUNT = new anchor.BN(1_000_000);
   const RELEASE_DELAY = new anchor.BN(0);
   const TIMEOUT = new anchor.BN(30 * 24 * 3600); // 30 days
   const DISPUTE_DELAY = new anchor.BN(0);
+  const DISPUTE_RESOLUTION_WINDOW = new anchor.BN(7 * 24 * 3600); // 7 days
   const METADATA_HASH = new Array(32).fill(0xAB);
 
   before(async () => {
@@ -76,53 +71,6 @@ describe("syndaxia-core (immutable)", () => {
       admin.payer,
       mint,
       feeCollector.publicKey
-    );
-
-    // ── Treasury setup ────────────────────────────────────────────────────────
-    // syndaxia-treasury.ts runs first (explicit ordering in Anchor.toml) and
-    // initialises the singleton TreasuryConfig PDA.  If the core tests are ever
-    // run in isolation the try-catch will initialise the treasury on the spot.
-    const TREASURY_PROGRAM_ID = new PublicKey(
-      "D8H3JetPqdFasLXGbAqjhrrArfoYmy8PwQtt8KehZLxd"
-    );
-    treasuryProgram = anchor.workspace.SyndaxiaTreasury as Program<SyndaxiaTreasury>;
-    [treasuryConfigPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("treasury-config")],
-      TREASURY_PROGRAM_ID
-    );
-
-    let treasuryFeeReceiver: PublicKey;
-    try {
-      const config = await treasuryProgram.account.treasuryConfig.fetch(
-        treasuryConfigPda
-      );
-      treasuryFeeReceiver = config.feeReceiver;
-    } catch (_) {
-      // Treasury not yet initialised — happens when running core tests standalone.
-      const tempMultisig = Keypair.generate();
-      const tempFeeReceiver = Keypair.generate();
-      for (const kp of [tempMultisig, tempFeeReceiver]) {
-        const sig = await provider.connection.requestAirdrop(
-          kp.publicKey,
-          2 * anchor.web3.LAMPORTS_PER_SOL
-        );
-        await provider.connection.confirmTransaction(sig);
-      }
-      await treasuryProgram.methods
-        .initialize(tempFeeReceiver.publicKey)
-        .accounts({ multisig: tempMultisig.publicKey })
-        .signers([tempMultisig])
-        .rpc();
-      treasuryFeeReceiver = tempFeeReceiver.publicKey;
-    }
-
-    // Token account with the deal mint, owned by treasury's fee_receiver.
-    // The Core program validates: treasury_token_account.owner == config.fee_receiver.
-    treasuryTokenAccount = await createAccount(
-      provider.connection,
-      admin.payer,
-      mint,
-      treasuryFeeReceiver
     );
   });
 
@@ -150,6 +98,7 @@ describe("syndaxia-core (immutable)", () => {
         opts.releaseDelay || RELEASE_DELAY,
         opts.timeout || TIMEOUT,
         opts.disputeDelay ?? DISPUTE_DELAY,
+        DISPUTE_RESOLUTION_WINDOW,
         METADATA_HASH,
         milestones
       )
@@ -161,7 +110,6 @@ describe("syndaxia-core (immutable)", () => {
         buyerTokenAccount: opts.buyerTokenAccount,
         feeCollector: feeCollector.publicKey,
         feeCollectorTokenAccount: feeCollectorTokenAccount,
-        treasuryTokenAccount: treasuryTokenAccount,
         mint: mint,
       })
       .signers([opts.buyer, dealKeypair])
@@ -229,6 +177,7 @@ describe("syndaxia-core (immutable)", () => {
           RELEASE_DELAY,
           TIMEOUT,
           DISPUTE_DELAY,
+          DISPUTE_RESOLUTION_WINDOW,
           METADATA_HASH,
           []
         )
@@ -240,7 +189,6 @@ describe("syndaxia-core (immutable)", () => {
           buyerTokenAccount: buyerTokenAccount,
           feeCollector: feeCollector.publicKey,
           feeCollectorTokenAccount: feeCollectorTokenAccount,
-          treasuryTokenAccount: treasuryTokenAccount,
           mint: mint,
         })
         .signers([buyer, dealKeypair])
@@ -265,10 +213,9 @@ describe("syndaxia-core (immutable)", () => {
       const feeAccount = await getAccount(provider.connection, feeCollectorTokenAccount);
       expect(Number(feeAccount.amount)).to.equal(50_000);
 
-      // Verify buyer balance decreased by amount + fees + protocol fee
-      // deal fee (5% of 1M = 50,000) + protocol fee (5 BPS of 1M = 500)
+      // Verify buyer balance decreased by amount + fees
       const buyerAfter = await getAccount(provider.connection, buyerTokenAccount);
-      expect(Number(buyerBefore.amount) - Number(buyerAfter.amount)).to.equal(1_050_500);
+      expect(Number(buyerBefore.amount) - Number(buyerAfter.amount)).to.equal(1_050_000);
     });
 
     it("rejects deal with zero amount", async () => {
@@ -276,7 +223,7 @@ describe("syndaxia-core (immutable)", () => {
 
       try {
         await program.methods
-          .createDeal(new anchor.BN(0), FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+          .createDeal(new anchor.BN(0), FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
           .accounts({
             deal: dealKeypair.publicKey,
             buyer: buyer.publicKey,
@@ -285,7 +232,6 @@ describe("syndaxia-core (immutable)", () => {
             buyerTokenAccount: buyerTokenAccount,
             feeCollector: feeCollector.publicKey,
             feeCollectorTokenAccount: feeCollectorTokenAccount,
-            treasuryTokenAccount: treasuryTokenAccount,
             mint: mint,
           })
           .signers([buyer, dealKeypair])
@@ -301,7 +247,7 @@ describe("syndaxia-core (immutable)", () => {
 
       try {
         await program.methods
-          .createDeal(DEAL_AMOUNT, new anchor.BN(1001), RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+          .createDeal(DEAL_AMOUNT, new anchor.BN(1001), RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
           .accounts({
             deal: dealKeypair.publicKey,
             buyer: buyer.publicKey,
@@ -310,7 +256,6 @@ describe("syndaxia-core (immutable)", () => {
             buyerTokenAccount: buyerTokenAccount,
             feeCollector: feeCollector.publicKey,
             feeCollectorTokenAccount: feeCollectorTokenAccount,
-            treasuryTokenAccount: treasuryTokenAccount,
             mint: mint,
           })
           .signers([buyer, dealKeypair])
@@ -504,7 +449,7 @@ describe("syndaxia-core (immutable)", () => {
       ];
 
       await program.methods
-        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, milestones)
+        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, milestones)
         .accounts({
           deal: dealKeypair.publicKey,
           buyer: buyer.publicKey,
@@ -513,7 +458,6 @@ describe("syndaxia-core (immutable)", () => {
           buyerTokenAccount: buyerTokenAccount,
           feeCollector: feeCollector.publicKey,
           feeCollectorTokenAccount: feeCollectorTokenAccount,
-          treasuryTokenAccount: treasuryTokenAccount,
           mint: mint,
         })
         .signers([buyer, dealKeypair])
@@ -535,7 +479,7 @@ describe("syndaxia-core (immutable)", () => {
       ];
 
       await program.methods
-        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, milestones)
+        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, milestones)
         .accounts({
           deal: dealKeypair.publicKey,
           buyer: buyer.publicKey,
@@ -544,7 +488,6 @@ describe("syndaxia-core (immutable)", () => {
           buyerTokenAccount: buyerTokenAccount,
           feeCollector: feeCollector.publicKey,
           feeCollectorTokenAccount: feeCollectorTokenAccount,
-          treasuryTokenAccount: treasuryTokenAccount,
           mint: mint,
         })
         .signers([buyer, dealKeypair])
@@ -631,6 +574,7 @@ describe("syndaxia-core (immutable)", () => {
             RELEASE_DELAY,
             TIMEOUT,
             DISPUTE_DELAY,
+            DISPUTE_RESOLUTION_WINDOW,
             METADATA_HASH,
             [new anchor.BN(500_000), new anchor.BN(400_000)] // sum = 900k != 1M
           )
@@ -642,7 +586,6 @@ describe("syndaxia-core (immutable)", () => {
             buyerTokenAccount: buyerTokenAccount,
             feeCollector: feeCollector.publicKey,
             feeCollectorTokenAccount: feeCollectorTokenAccount,
-            treasuryTokenAccount: treasuryTokenAccount,
             mint: mint,
           })
           .signers([buyer, dealKeypair])
@@ -932,7 +875,7 @@ describe("syndaxia-core (immutable)", () => {
 
       try {
         await program.methods
-          .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+          .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
           .accounts({
             deal: dealKeypair.publicKey,
             buyer: buyer.publicKey,
@@ -941,7 +884,6 @@ describe("syndaxia-core (immutable)", () => {
             buyerTokenAccount: buyerTokenAccount,
             feeCollector: feeCollector.publicKey,
             feeCollectorTokenAccount: hackerCollectorTokenAccount,
-            treasuryTokenAccount: treasuryTokenAccount,
             mint: mint,
           })
           .signers([buyer, dealKeypair])
@@ -1128,7 +1070,7 @@ describe("syndaxia-core (immutable)", () => {
 
       try {
         await program.methods
-          .createDeal(DEAL_AMOUNT, FEE_BPS, new anchor.BN(-1), TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+          .createDeal(DEAL_AMOUNT, FEE_BPS, new anchor.BN(-1), TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
           .accounts({
             deal: dealKeypair.publicKey,
             buyer: buyer.publicKey,
@@ -1137,7 +1079,6 @@ describe("syndaxia-core (immutable)", () => {
             buyerTokenAccount: buyerTokenAccount,
             feeCollector: feeCollector.publicKey,
             feeCollectorTokenAccount: feeCollectorTokenAccount,
-            treasuryTokenAccount: treasuryTokenAccount,
             mint: mint,
           })
           .signers([buyer, dealKeypair])
@@ -1157,7 +1098,7 @@ describe("syndaxia-core (immutable)", () => {
 
       try {
         await program.methods
-          .createDeal(DEAL_AMOUNT, FEE_BPS, tooLong, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+          .createDeal(DEAL_AMOUNT, FEE_BPS, tooLong, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
           .accounts({
             deal: dealKeypair.publicKey,
             buyer: buyer.publicKey,
@@ -1166,7 +1107,6 @@ describe("syndaxia-core (immutable)", () => {
             buyerTokenAccount: buyerTokenAccount,
             feeCollector: feeCollector.publicKey,
             feeCollectorTokenAccount: feeCollectorTokenAccount,
-            treasuryTokenAccount: treasuryTokenAccount,
             mint: mint,
           })
           .signers([buyer, dealKeypair])
@@ -1185,7 +1125,7 @@ describe("syndaxia-core (immutable)", () => {
 
       try {
         await program.methods
-          .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+          .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
           .accounts({
             deal: dealKeypair.publicKey,
             buyer: buyer.publicKey,
@@ -1194,7 +1134,6 @@ describe("syndaxia-core (immutable)", () => {
             buyerTokenAccount: buyerTokenAccount,
             feeCollector: feeCollector.publicKey,
             feeCollectorTokenAccount: feeCollectorTokenAccount,
-            treasuryTokenAccount: treasuryTokenAccount,
             mint: mint,
           })
           .signers([buyer, dealKeypair])
@@ -1213,7 +1152,7 @@ describe("syndaxia-core (immutable)", () => {
 
       try {
         await program.methods
-          .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+          .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
           .accounts({
             deal: dealKeypair.publicKey,
             buyer: buyer.publicKey,
@@ -1222,7 +1161,6 @@ describe("syndaxia-core (immutable)", () => {
             buyerTokenAccount: buyerTokenAccount,
             feeCollector: feeCollector.publicKey,
             feeCollectorTokenAccount: feeCollectorTokenAccount,
-            treasuryTokenAccount: treasuryTokenAccount,
             mint: mint,
           })
           .signers([buyer, dealKeypair])
@@ -1239,7 +1177,7 @@ describe("syndaxia-core (immutable)", () => {
       const maxDelay = new anchor.BN(365 * 24 * 3600);
 
       await program.methods
-        .createDeal(DEAL_AMOUNT, FEE_BPS, maxDelay, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+        .createDeal(DEAL_AMOUNT, FEE_BPS, maxDelay, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey,
           buyer: buyer.publicKey,
@@ -1248,7 +1186,6 @@ describe("syndaxia-core (immutable)", () => {
           buyerTokenAccount: buyerTokenAccount,
           feeCollector: feeCollector.publicKey,
           feeCollectorTokenAccount: feeCollectorTokenAccount,
-          treasuryTokenAccount: treasuryTokenAccount,
           mint: mint,
         })
         .signers([buyer, dealKeypair])
@@ -1264,7 +1201,7 @@ describe("syndaxia-core (immutable)", () => {
 
       try {
         await program.methods
-          .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, tooShort, DISPUTE_DELAY, METADATA_HASH, [])
+          .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, tooShort, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
           .accounts({
             deal: dealKeypair.publicKey,
             buyer: buyer.publicKey,
@@ -1273,7 +1210,6 @@ describe("syndaxia-core (immutable)", () => {
             buyerTokenAccount: buyerTokenAccount,
             feeCollector: feeCollector.publicKey,
             feeCollectorTokenAccount: feeCollectorTokenAccount,
-            treasuryTokenAccount: treasuryTokenAccount,
             mint: mint,
           })
           .signers([buyer, dealKeypair])
@@ -1288,7 +1224,7 @@ describe("syndaxia-core (immutable)", () => {
       const dealKeypair = Keypair.generate();
 
       await program.methods
-        .createDeal(DEAL_AMOUNT, new anchor.BN(0), RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+        .createDeal(DEAL_AMOUNT, new anchor.BN(0), RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey,
           buyer: buyer.publicKey,
@@ -1297,7 +1233,6 @@ describe("syndaxia-core (immutable)", () => {
           buyerTokenAccount: buyerTokenAccount,
           feeCollector: feeCollector.publicKey,
           feeCollectorTokenAccount: feeCollectorTokenAccount,
-          treasuryTokenAccount: treasuryTokenAccount,
           mint: mint,
         })
         .signers([buyer, dealKeypair])
@@ -1358,7 +1293,7 @@ describe("syndaxia-core (immutable)", () => {
       const dealKeypair = Keypair.generate();
       try {
         await program.methods
-          .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, new anchor.BN(-1), METADATA_HASH, [])
+          .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, new anchor.BN(-1), DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
           .accounts({
             deal: dealKeypair.publicKey,
             buyer: buyer.publicKey,
@@ -1367,7 +1302,6 @@ describe("syndaxia-core (immutable)", () => {
             buyerTokenAccount: buyerTokenAccount,
             feeCollector: feeCollector.publicKey,
             feeCollectorTokenAccount: feeCollectorTokenAccount,
-            treasuryTokenAccount: treasuryTokenAccount,
             mint: mint,
           })
           .signers([buyer, dealKeypair])
@@ -1383,7 +1317,7 @@ describe("syndaxia-core (immutable)", () => {
       const tooLong = new anchor.BN(366 * 24 * 3600);
       try {
         await program.methods
-          .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, tooLong, METADATA_HASH, [])
+          .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, tooLong, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
           .accounts({
             deal: dealKeypair.publicKey,
             buyer: buyer.publicKey,
@@ -1392,7 +1326,6 @@ describe("syndaxia-core (immutable)", () => {
             buyerTokenAccount: buyerTokenAccount,
             feeCollector: feeCollector.publicKey,
             feeCollectorTokenAccount: feeCollectorTokenAccount,
-            treasuryTokenAccount: treasuryTokenAccount,
             mint: mint,
           })
           .signers([buyer, dealKeypair])
@@ -1407,7 +1340,7 @@ describe("syndaxia-core (immutable)", () => {
       const dealKeypair = Keypair.generate();
       const maxDelay = new anchor.BN(365 * 24 * 3600);
       await program.methods
-        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, maxDelay, METADATA_HASH, [])
+        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, maxDelay, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey,
           buyer: buyer.publicKey,
@@ -1416,7 +1349,6 @@ describe("syndaxia-core (immutable)", () => {
           buyerTokenAccount: buyerTokenAccount,
           feeCollector: feeCollector.publicKey,
           feeCollectorTokenAccount: feeCollectorTokenAccount,
-          treasuryTokenAccount: treasuryTokenAccount,
           mint: mint,
         })
         .signers([buyer, dealKeypair])
@@ -1790,7 +1722,7 @@ describe("syndaxia-core (immutable)", () => {
       const dealKeypair = Keypair.generate();
       const oneHour = new anchor.BN(3600);
       await program.methods
-        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, oneHour, DISPUTE_DELAY, METADATA_HASH, [])
+        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, oneHour, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey,
           buyer: buyer.publicKey,
@@ -1799,7 +1731,6 @@ describe("syndaxia-core (immutable)", () => {
           buyerTokenAccount: buyerTokenAccount,
           feeCollector: feeCollector.publicKey,
           feeCollectorTokenAccount: feeCollectorTokenAccount,
-          treasuryTokenAccount: treasuryTokenAccount,
           mint: mint,
         })
         .signers([buyer, dealKeypair])
@@ -1814,7 +1745,7 @@ describe("syndaxia-core (immutable)", () => {
       const tooShort = new anchor.BN(1800); // 30 minutes
       try {
         await program.methods
-          .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, tooShort, DISPUTE_DELAY, METADATA_HASH, [])
+          .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, tooShort, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
           .accounts({
             deal: dealKeypair.publicKey,
             buyer: buyer.publicKey,
@@ -1823,7 +1754,6 @@ describe("syndaxia-core (immutable)", () => {
             buyerTokenAccount: buyerTokenAccount,
             feeCollector: feeCollector.publicKey,
             feeCollectorTokenAccount: feeCollectorTokenAccount,
-            treasuryTokenAccount: treasuryTokenAccount,
             mint: mint,
           })
           .signers([buyer, dealKeypair])

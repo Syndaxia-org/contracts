@@ -19,8 +19,9 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::constants::{
-    MAX_DISPUTE_DELAY, MAX_FEE_BPS, MAX_MILESTONES, MAX_PROTOCOL_FEE_BPS,
-    MAX_RELEASE_DELAY, MIN_TIMEOUT, TREASURY_CONFIG_SEED, TREASURY_PROGRAM_ID,
+    MAX_DISPUTE_DELAY, MAX_DISPUTE_EXTENSIONS, MAX_DISPUTE_RESOLUTION_WINDOW, MAX_FEE_BPS,
+    MAX_MILESTONES, MAX_PROTOCOL_FEE_BPS, MAX_RELEASE_DELAY, MAX_TIMEOUT,
+    MIN_DISPUTE_RESOLUTION_WINDOW, MIN_TIMEOUT, TREASURY_CONFIG_SEED, TREASURY_PROGRAM_ID,
 };
 use crate::errors::SyndaxiaError;
 use crate::libraries::math::calculate_fee;
@@ -73,6 +74,7 @@ pub fn handler(
     release_delay: i64,
     timeout: i64,
     dispute_delay: i64,
+    dispute_resolution_window: i64,
     metadata_hash: [u8; 32],
     milestone_amounts: Vec<u64>,
 ) -> Result<()> {
@@ -81,8 +83,11 @@ pub fn handler(
     require!(release_delay >= 0, SyndaxiaError::InvalidReleaseDelay);
     require!(release_delay <= MAX_RELEASE_DELAY, SyndaxiaError::InvalidReleaseDelay);
     require!(timeout >= MIN_TIMEOUT, SyndaxiaError::InvalidTimeout);
+    require!(timeout <= MAX_TIMEOUT, SyndaxiaError::TimeoutTooLong);
     require!(dispute_delay >= 0, SyndaxiaError::InvalidDisputeDelay);
     require!(dispute_delay <= MAX_DISPUTE_DELAY, SyndaxiaError::InvalidDisputeDelay);
+    require!(dispute_resolution_window >= MIN_DISPUTE_RESOLUTION_WINDOW, SyndaxiaError::InvalidDisputeResolutionWindow);
+    require!(dispute_resolution_window <= MAX_DISPUTE_RESOLUTION_WINDOW, SyndaxiaError::InvalidDisputeResolutionWindow);
     require!(
         ctx.accounts.buyer.key() != ctx.accounts.seller.key(),
         SyndaxiaError::BuyerEqualsSeller
@@ -90,6 +95,10 @@ pub fn handler(
     require!(
         ctx.accounts.buyer.key() != ctx.accounts.validator.key(),
         SyndaxiaError::InvalidValidator
+    );
+    require!(
+        ctx.accounts.seller.key() != ctx.accounts.validator.key(),
+        SyndaxiaError::ValidatorEqualsSeller
     );
 
     // ── Milestone validation ──
@@ -110,21 +119,19 @@ pub fn handler(
     // ── Protocol fee (Treasury) ──
     // Manual deserialization: no CPI type dependency on syndaxia-treasury.
     // TreasuryConfig layout: 8 disc | 32 multisig | 32 fee_receiver | 8 protocol_fee_bps | ...
-    let (protocol_fee_bps, treasury_fee_receiver) = {
+    let protocol_fee_bps = {
         let data = ctx.accounts.treasury_config.try_borrow_data()?;
         require!(data.len() >= 80, SyndaxiaError::InvalidTreasuryConfig);
-        let fee_receiver = Pubkey::try_from(&data[40..72])
-            .map_err(|_| error!(SyndaxiaError::InvalidTreasuryConfig))?;
-        let bps = u64::from_le_bytes(
+        u64::from_le_bytes(
             data[72..80].try_into().map_err(|_| error!(SyndaxiaError::InvalidTreasuryConfig))?,
-        );
-        (bps, fee_receiver)
+        )
     };
     // Double-check: guard against a governance bug setting a value above our hardcoded cap.
     require!(protocol_fee_bps <= MAX_PROTOCOL_FEE_BPS, SyndaxiaError::InvalidProtocolFee);
-    // Verify the treasury token account belongs to the fee_receiver declared in treasury state.
+    // Verify the treasury token account is owned by the treasury config PDA —
+    // fees accumulate under program control; multisig withdraws via treasury::withdraw().
     require!(
-        ctx.accounts.treasury_token_account.owner == treasury_fee_receiver,
+        ctx.accounts.treasury_token_account.owner == ctx.accounts.treasury_config.key(),
         SyndaxiaError::InvalidTreasuryTokenAccount
     );
     let protocol_fee = calculate_fee(amount, protocol_fee_bps)?;
@@ -185,6 +192,9 @@ pub fn handler(
     deal.release_delay = release_delay;
     deal.timeout = timeout;
     deal.dispute_delay = dispute_delay;
+    deal.dispute_resolution_window = dispute_resolution_window;
+    deal.disputed_at = 0;
+    deal.dispute_extensions_remaining = MAX_DISPUTE_EXTENSIONS;
     deal.status = Status::Open;
     deal.milestone_count = milestone_count as u8;
     deal.released_mask = 0;
@@ -204,6 +214,7 @@ pub fn handler(
         release_delay,
         timeout,
         dispute_delay,
+        dispute_resolution_window,
         metadata_hash,
         milestone_count: deal.milestone_count,
     });
@@ -226,6 +237,7 @@ pub struct DealCreated {
     pub release_delay: i64,
     pub timeout: i64,
     pub dispute_delay: i64,
+    pub dispute_resolution_window: i64,
     pub metadata_hash: [u8; 32],
     pub milestone_count: u8,
 }

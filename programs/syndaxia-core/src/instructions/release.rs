@@ -46,14 +46,23 @@ pub fn handler(ctx: Context<ReleaseRefund>) -> Result<()> {
     let deal = &mut ctx.accounts.deal;
 
     require!(
-        ctx.accounts.authority.key() == deal.buyer
-            || ctx.accounts.authority.key() == deal.validator,
-        SyndaxiaError::Unauthorized
-    );
-    require!(
         deal.status == Status::Open || deal.status == Status::Disputed,
         SyndaxiaError::NotEligible
     );
+    // From Disputed, only the validator can act (protects the arbitration mechanism).
+    // From Open, buyer or validator are both authorized.
+    if deal.status == Status::Disputed {
+        require!(
+            ctx.accounts.authority.key() == deal.validator,
+            SyndaxiaError::Unauthorized
+        );
+    } else {
+        require!(
+            ctx.accounts.authority.key() == deal.buyer
+                || ctx.accounts.authority.key() == deal.validator,
+            SyndaxiaError::Unauthorized
+        );
+    }
     // Simple release requires milestone_count == 0
     require!(deal.milestone_count == 0, SyndaxiaError::UseMilestoneRelease);
 
@@ -64,6 +73,13 @@ pub fn handler(ctx: Context<ReleaseRefund>) -> Result<()> {
             now >= deal.created_at.checked_add(deal.release_delay).ok_or(SyndaxiaError::MathOverflow)?,
             SyndaxiaError::ReleaseTooEarly
         );
+
+        // Reject if deal has already expired — prevents race with expire_deal.
+        let expiry = deal.created_at
+            .checked_add(deal.release_delay)
+            .and_then(|v| v.checked_add(deal.timeout))
+            .ok_or(SyndaxiaError::MathOverflow)?;
+        require!(now < expiry, SyndaxiaError::DealExpired);
     }
 
     deal.status = Status::Released;

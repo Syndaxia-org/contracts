@@ -46,6 +46,10 @@ pub fn handler(ctx: Context<TransferBeneficiary>, new_beneficiary: Pubkey) -> Re
         new_beneficiary != deal.buyer,
         SyndaxiaError::BeneficiaryEqualsBuyer
     );
+    require!(
+        new_beneficiary != deal.validator,
+        SyndaxiaError::BeneficiaryEqualsValidator
+    );
 
     let old = deal.beneficiary;
     deal.beneficiary = new_beneficiary;

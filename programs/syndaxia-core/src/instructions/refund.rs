@@ -29,16 +29,28 @@ pub fn handler(ctx: Context<ReleaseRefund>) -> Result<()> {
     let deal = &mut ctx.accounts.deal;
 
     require!(
-        ctx.accounts.authority.key() == deal.beneficiary
-            || ctx.accounts.authority.key() == deal.validator,
-        SyndaxiaError::Unauthorized
-    );
-    require!(
         deal.status == Status::Open || deal.status == Status::Disputed,
         SyndaxiaError::NotEligible
     );
+    // From Disputed, only the validator can act (protects the arbitration mechanism).
+    // From Open, beneficiary (seller) or validator are both authorized.
+    if deal.status == Status::Disputed {
+        require!(
+            ctx.accounts.authority.key() == deal.validator,
+            SyndaxiaError::Unauthorized
+        );
+    } else {
+        require!(
+            ctx.accounts.authority.key() == deal.beneficiary
+                || ctx.accounts.authority.key() == deal.validator,
+            SyndaxiaError::Unauthorized
+        );
+    }
 
     deal.status = Status::Refunded;
+
+    // Use remaining amount for milestone deals with partial releases.
+    let refund_amount = deal.remaining_escrow_amount().map_err(|_| SyndaxiaError::MathOverflow)?;
 
     let deal_key = deal.key();
     let seeds = &[
@@ -58,7 +70,7 @@ pub fn handler(ctx: Context<ReleaseRefund>) -> Result<()> {
             },
             signer,
         ),
-        deal.amount,
+        refund_amount,
     )?;
 
     token::close_account(CpiContext::new_with_signer(
@@ -75,7 +87,7 @@ pub fn handler(ctx: Context<ReleaseRefund>) -> Result<()> {
         deal: deal_key,
         buyer: deal.buyer,
         beneficiary: deal.beneficiary,
-        amount: deal.amount,
+        amount: refund_amount,
         authority: ctx.accounts.authority.key(),
     });
 

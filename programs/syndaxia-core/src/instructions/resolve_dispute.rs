@@ -42,11 +42,12 @@ pub fn handler(
         deal.status == Status::Disputed,
         SyndaxiaError::NotDisputed
     );
-    // Shares must sum to the escrowed amount
+    // Shares must sum to the amount still held in escrow (accounts for partial milestone releases).
+    let remaining = deal.remaining_escrow_amount().map_err(|_| SyndaxiaError::MathOverflow)?;
     let total = buyer_share
         .checked_add(seller_share)
         .ok_or(SyndaxiaError::MathOverflow)?;
-    require!(total == deal.amount, SyndaxiaError::InvalidSplit);
+    require!(total == remaining, SyndaxiaError::InvalidSplit);
 
     deal.status = Status::Released;
 

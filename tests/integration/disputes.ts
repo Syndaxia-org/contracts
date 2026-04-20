@@ -14,7 +14,7 @@ import { expect } from "chai";
 import { setupBase, setupActors, BaseContext } from "../helpers/setup";
 import { setupTreasury } from "../helpers/treasury";
 import { createTestDeal } from "../helpers/deal";
-import { DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH } from "../helpers/constants";
+import { DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH } from "../helpers/constants";
 
 describe("dispute mechanics & resolve_dispute", () => {
   let ctx: BaseContext;
@@ -37,7 +37,7 @@ describe("dispute mechanics & resolve_dispute", () => {
     const dealKeypair = Keypair.generate();
     try {
       await ctx.program.methods
-        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, new anchor.BN(-1), METADATA_HASH, [])
+        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, new anchor.BN(-1), DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey, buyer: buyer.publicKey, seller: seller.publicKey,
           validator: ctx.validator.publicKey, buyerTokenAccount,
@@ -56,7 +56,7 @@ describe("dispute mechanics & resolve_dispute", () => {
     const dealKeypair = Keypair.generate();
     try {
       await ctx.program.methods
-        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, new anchor.BN(366 * 24 * 3600), METADATA_HASH, [])
+        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, new anchor.BN(366 * 24 * 3600), DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey, buyer: buyer.publicKey, seller: seller.publicKey,
           validator: ctx.validator.publicKey, buyerTokenAccount,
@@ -74,7 +74,7 @@ describe("dispute mechanics & resolve_dispute", () => {
   it("accepts dispute_delay at exactly 365 days (boundary)", async () => {
     const dealKeypair = Keypair.generate();
     await ctx.program.methods
-      .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, new anchor.BN(365 * 24 * 3600), METADATA_HASH, [])
+      .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, new anchor.BN(365 * 24 * 3600), DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
       .accounts({
         deal: dealKeypair.publicKey, buyer: buyer.publicKey, seller: seller.publicKey,
         validator: ctx.validator.publicKey, buyerTokenAccount,
@@ -367,7 +367,7 @@ describe("dispute mechanics & resolve_dispute", () => {
   it("accepts timeout at exactly 1 hour (boundary)", async () => {
     const dealKeypair = Keypair.generate();
     await ctx.program.methods
-      .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, new anchor.BN(3600), DISPUTE_DELAY, METADATA_HASH, [])
+      .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, new anchor.BN(3600), DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
       .accounts({
         deal: dealKeypair.publicKey, buyer: buyer.publicKey, seller: seller.publicKey,
         validator: ctx.validator.publicKey, buyerTokenAccount,
@@ -385,7 +385,7 @@ describe("dispute mechanics & resolve_dispute", () => {
     const dealKeypair = Keypair.generate();
     try {
       await ctx.program.methods
-        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, new anchor.BN(1800), DISPUTE_DELAY, METADATA_HASH, [])
+        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, new anchor.BN(1800), DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey, buyer: buyer.publicKey, seller: seller.publicKey,
           validator: ctx.validator.publicKey, buyerTokenAccount,

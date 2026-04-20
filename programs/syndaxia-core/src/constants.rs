@@ -30,8 +30,20 @@ pub const MAX_RELEASE_DELAY: i64 = 365 * 24 * 3600;
 /// their own timeout per deal, but cannot go below this.
 pub const MIN_TIMEOUT: i64 = 3600;
 
+/// Maximum timeout in seconds (365 days). Prevents deals from being locked forever.
+pub const MAX_TIMEOUT: i64 = 365 * 24 * 3600;
+
 /// Maximum allowed dispute delay in seconds (365 days).
 pub const MAX_DISPUTE_DELAY: i64 = 365 * 24 * 3600;
+
+/// Minimum dispute resolution window per deal (1 day).
+pub const MIN_DISPUTE_RESOLUTION_WINDOW: i64 = 24 * 3600;
+
+/// Maximum dispute resolution window per deal (365 days).
+pub const MAX_DISPUTE_RESOLUTION_WINDOW: i64 = 365 * 24 * 3600;
+
+/// Maximum number of times the validator can extend a dispute resolution window.
+pub const MAX_DISPUTE_EXTENSIONS: u8 = 2;
 
 /// Maximum number of milestones per deal.
 pub const MAX_MILESTONES: usize = 8;

@@ -39,8 +39,8 @@ pub fn handler(ctx: Context<DisputeDeal>) -> Result<()> {
     require!(deal.status == Status::Open, SyndaxiaError::NotOpen);
 
     // Cooling period: force off-chain resolution attempt before on-chain dispute.
+    let now = Clock::get()?.unix_timestamp;
     if deal.dispute_delay > 0 {
-        let now = Clock::get()?.unix_timestamp;
         let earliest_dispute = deal
             .created_at
             .checked_add(deal.dispute_delay)
@@ -49,12 +49,16 @@ pub fn handler(ctx: Context<DisputeDeal>) -> Result<()> {
     }
 
     deal.status = Status::Disputed;
+    deal.disputed_at = now;
 
     emit!(DealDisputed {
         deal: deal.key(),
         buyer: deal.buyer,
         beneficiary: deal.beneficiary,
         opened_by: ctx.accounts.authority.key(),
+        resolution_deadline: now
+            .checked_add(deal.dispute_resolution_window)
+            .unwrap_or(i64::MAX),
     });
 
     Ok(())
@@ -66,4 +70,6 @@ pub struct DealDisputed {
     pub buyer: Pubkey,
     pub beneficiary: Pubkey,
     pub opened_by: Pubkey,
+    /// Validator must resolve before this timestamp or the deal becomes expirable.
+    pub resolution_deadline: i64,
 }

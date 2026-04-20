@@ -12,7 +12,7 @@ import { expect } from "chai";
 import { setupBase, setupActors, BaseContext } from "../helpers/setup";
 import { setupTreasury } from "../helpers/treasury";
 import { createTestDeal } from "../helpers/deal";
-import { DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH } from "../helpers/constants";
+import { DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH } from "../helpers/constants";
 
 describe("deal lifecycle", () => {
   let ctx: BaseContext;
@@ -39,7 +39,7 @@ describe("deal lifecycle", () => {
     const buyerBefore = await getAccount(ctx.provider.connection, buyerTokenAccount);
 
     await ctx.program.methods
-      .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+      .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
       .accounts({
         deal: dealKeypair.publicKey,
         buyer: buyer.publicKey,
@@ -80,7 +80,7 @@ describe("deal lifecycle", () => {
     const dealKeypair = Keypair.generate();
     try {
       await ctx.program.methods
-        .createDeal(new anchor.BN(0), FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+        .createDeal(new anchor.BN(0), FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey,
           buyer: buyer.publicKey,
@@ -104,7 +104,7 @@ describe("deal lifecycle", () => {
     const dealKeypair = Keypair.generate();
     try {
       await ctx.program.methods
-        .createDeal(DEAL_AMOUNT, new anchor.BN(1001), RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+        .createDeal(DEAL_AMOUNT, new anchor.BN(1001), RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey,
           buyer: buyer.publicKey,

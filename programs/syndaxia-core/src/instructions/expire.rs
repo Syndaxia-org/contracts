@@ -29,25 +29,38 @@ use super::release::ReleaseRefund;
 pub fn handler(ctx: Context<ReleaseRefund>) -> Result<()> {
     let deal = &mut ctx.accounts.deal;
 
-    // Only Open deals can expire by timeout.
-    // Disputed deals must be resolved by the validator via resolve_dispute.
+    // Open or Disputed deals can expire by timeout.
+    // Disputed deals use a longer timeout to give the validator time to resolve.
     require!(
-        deal.status == Status::Open,
+        deal.status == Status::Open || deal.status == Status::Disputed,
         SyndaxiaError::NotEligible
     );
 
     let now = Clock::get()?.unix_timestamp;
-    let effective_timeout = deal
-        .release_delay
-        .checked_add(deal.timeout)
-        .ok_or(SyndaxiaError::MathOverflow)?;
-    let expiry = deal
-        .created_at
-        .checked_add(effective_timeout)
-        .ok_or(SyndaxiaError::MathOverflow)?;
+
+    let expiry = if deal.status == Status::Open {
+        // Open deals: expires at created_at + release_delay + timeout
+        let effective_timeout = deal
+            .release_delay
+            .checked_add(deal.timeout)
+            .ok_or(SyndaxiaError::MathOverflow)?;
+        deal.created_at
+            .checked_add(effective_timeout)
+            .ok_or(SyndaxiaError::MathOverflow)?
+    } else {
+        // Disputed deals: validator has `dispute_resolution_window` seconds (set per deal
+        // at creation) from when the dispute was opened.
+        // This guarantees the marketplace-configured resolution window even for short-timeout deals.
+        deal.disputed_at
+            .checked_add(deal.dispute_resolution_window)
+            .ok_or(SyndaxiaError::MathOverflow)?
+    };
     require!(now >= expiry, SyndaxiaError::DealNotExpired);
 
     deal.status = Status::Refunded;
+
+    // Use remaining amount for milestone deals with partial releases.
+    let refund_amount = deal.remaining_escrow_amount().map_err(|_| SyndaxiaError::MathOverflow)?;
 
     let deal_key = deal.key();
     let seeds = &[
@@ -67,7 +80,7 @@ pub fn handler(ctx: Context<ReleaseRefund>) -> Result<()> {
             },
             signer,
         ),
-        deal.amount,
+        refund_amount,
     )?;
 
     token::close_account(CpiContext::new_with_signer(
@@ -84,7 +97,7 @@ pub fn handler(ctx: Context<ReleaseRefund>) -> Result<()> {
         deal: deal_key,
         buyer: deal.buyer,
         beneficiary: deal.beneficiary,
-        amount: deal.amount,
+        amount: refund_amount,
     });
 
     Ok(())

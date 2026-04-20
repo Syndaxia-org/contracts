@@ -44,14 +44,23 @@ pub fn handler(ctx: Context<ReleaseMilestone>, milestone_index: u8) -> Result<()
     let deal = &mut ctx.accounts.deal;
 
     require!(
-        ctx.accounts.authority.key() == deal.buyer
-            || ctx.accounts.authority.key() == deal.validator,
-        SyndaxiaError::Unauthorized
-    );
-    require!(
         deal.status == Status::Open || deal.status == Status::Disputed,
         SyndaxiaError::NotEligible
     );
+    // From Disputed, only the validator can act (protects the arbitration mechanism).
+    // From Open, buyer or validator are both authorized.
+    if deal.status == Status::Disputed {
+        require!(
+            ctx.accounts.authority.key() == deal.validator,
+            SyndaxiaError::Unauthorized
+        );
+    } else {
+        require!(
+            ctx.accounts.authority.key() == deal.buyer
+                || ctx.accounts.authority.key() == deal.validator,
+            SyndaxiaError::Unauthorized
+        );
+    }
     require!(deal.milestone_count > 0, SyndaxiaError::NotMilestoneDeal);
     require!(
         milestone_index < deal.milestone_count,
@@ -68,6 +77,13 @@ pub fn handler(ctx: Context<ReleaseMilestone>, milestone_index: u8) -> Result<()
             now >= deal.created_at.checked_add(deal.release_delay).ok_or(SyndaxiaError::MathOverflow)?,
             SyndaxiaError::ReleaseTooEarly
         );
+
+        // Reject if deal has already expired — prevents race with expire_deal.
+        let expiry = deal.created_at
+            .checked_add(deal.release_delay)
+            .and_then(|v| v.checked_add(deal.timeout))
+            .ok_or(SyndaxiaError::MathOverflow)?;
+        require!(now < expiry, SyndaxiaError::DealExpired);
     }
 
     let ms_amount = deal.milestone_amounts[milestone_index as usize];

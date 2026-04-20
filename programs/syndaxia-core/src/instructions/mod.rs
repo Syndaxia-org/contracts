@@ -15,9 +15,12 @@
 //   Commercial use by any other entity is strictly prohibited without prior
 //   written consent from the Licensor (Association Syndaxia).
 
+#![allow(ambiguous_glob_reexports)]
+
 pub mod create_deal;
 pub mod dispute;
 pub mod expire;
+pub mod extend_dispute;
 pub mod refund;
 pub mod release;
 pub mod release_milestone;
@@ -26,9 +29,7 @@ pub mod transfer_beneficiary;
 
 pub use create_deal::*;
 pub use dispute::*;
-pub use expire::*;
-pub use refund::*;
+pub use extend_dispute::*;
 pub use release::*;
 pub use release_milestone::*;
-pub use resolve_dispute::*;
 pub use transfer_beneficiary::*;

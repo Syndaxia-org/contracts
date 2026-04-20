@@ -12,7 +12,7 @@ import { expect } from "chai";
 import { setupBase, setupActors, BaseContext } from "../helpers/setup";
 import { setupTreasury } from "../helpers/treasury";
 import { createTestDeal } from "../helpers/deal";
-import { DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH } from "../helpers/constants";
+import { DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH } from "../helpers/constants";
 
 describe("milestone deals", () => {
   let ctx: BaseContext;
@@ -34,7 +34,7 @@ describe("milestone deals", () => {
     const milestones = [new anchor.BN(400_000), new anchor.BN(300_000), new anchor.BN(300_000)];
 
     await ctx.program.methods
-      .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, milestones)
+      .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, milestones)
       .accounts({
         deal: dealKeypair.publicKey,
         buyer: buyer.publicKey,
@@ -135,7 +135,7 @@ describe("milestone deals", () => {
     try {
       await ctx.program.methods
         .createDeal(
-          DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH,
+          DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH,
           [new anchor.BN(500_000), new anchor.BN(400_000)] // sum = 900k ≠ 1M
         )
         .accounts({

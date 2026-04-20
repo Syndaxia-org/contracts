@@ -11,7 +11,7 @@
 
 import * as anchor from "@coral-xyz/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { createAccount } from "@solana/spl-token";
+import { createAccount, getOrCreateAssociatedTokenAccount } from "@solana/spl-token";
 import { TREASURY_PROGRAM_ID, TREASURY_CONFIG_SEED } from "./constants";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -59,13 +59,15 @@ export async function setupTreasury(
     feeReceiver = feeReceiverKp.publicKey;
   }
 
-  // Token account owned by fee_receiver; the core program validates this.
-  const treasuryTokenAccount = await createAccount(
+  // Token account owned by the treasury config PDA; the core program validates this.
+  const treasuryAta = await getOrCreateAssociatedTokenAccount(
     provider.connection,
     (provider.wallet as anchor.Wallet).payer,
     mint,
-    feeReceiver
+    treasuryConfigPda,
+    true // allowOwnerOffCurve — PDA is off-curve
   );
+  const treasuryTokenAccount = treasuryAta.address;
 
   return { treasuryConfigPda, treasuryTokenAccount };
 }

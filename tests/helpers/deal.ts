@@ -11,6 +11,7 @@ import { SyndaxiaCore } from "../../target/types/syndaxia_core";
 import {
   DEAL_AMOUNT,
   DISPUTE_DELAY,
+  DISPUTE_RESOLUTION_WINDOW,
   FEE_BPS,
   METADATA_HASH,
   RELEASE_DELAY,
@@ -34,6 +35,7 @@ export interface CreateDealOpts {
   releaseDelay?: anchor.BN;
   timeout?: anchor.BN;
   disputeDelay?: anchor.BN;
+  disputeResolutionWindow?: anchor.BN;
   milestoneAmounts?: anchor.BN[];
 }
 
@@ -47,6 +49,7 @@ export async function createTestDeal(opts: CreateDealOpts): Promise<Keypair> {
       opts.releaseDelay ?? RELEASE_DELAY,
       opts.timeout ?? TIMEOUT,
       opts.disputeDelay ?? DISPUTE_DELAY,
+      opts.disputeResolutionWindow ?? DISPUTE_RESOLUTION_WINDOW,
       METADATA_HASH,
       opts.milestoneAmounts ?? []
     )

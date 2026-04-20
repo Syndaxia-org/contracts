@@ -3,6 +3,7 @@
 //
 // Licensed under the Business Source License 1.1 (the "License");
 // you may not use this file except in compliance with the License.
+#![allow(unexpected_cfgs)]
 // You may obtain a copy of the License at
 //
 //     https://mariadb.com/bsl11/
@@ -25,7 +26,7 @@ pub mod state;
 
 use instructions::*;
 
-declare_id!("Hj3Zs6F1SBPwHKyvkQDZT5JeZuYHu7FBD3smcnFEDyRp");
+declare_id!("FnzdhUJf3YKmQhSWVQD3Qr9jKu4DjnWEMWiNypX43f1x");
 
 #[program]
 pub mod syndaxia_core {
@@ -41,10 +42,11 @@ pub mod syndaxia_core {
         release_delay: i64,
         timeout: i64,
         dispute_delay: i64,
+        dispute_resolution_window: i64,
         metadata_hash: [u8; 32],
         milestone_amounts: Vec<u64>,
     ) -> Result<()> {
-        instructions::create_deal::handler(ctx, amount, fee_bps, release_delay, timeout, dispute_delay, metadata_hash, milestone_amounts)
+        instructions::create_deal::handler(ctx, amount, fee_bps, release_delay, timeout, dispute_delay, dispute_resolution_window, metadata_hash, milestone_amounts)
     }
 
     /// Release all escrowed funds to the beneficiary (simple deal, no milestones).
@@ -85,6 +87,12 @@ pub mod syndaxia_core {
     /// Expire a deal past its timeout and refund the buyer (permissionless).
     pub fn expire_deal(ctx: Context<ReleaseRefund>) -> Result<()> {
         instructions::expire::handler(ctx)
+    }
+
+    /// Extend the dispute resolution window.
+    /// Authorized: validator only. Limited to MAX_DISPUTE_EXTENSIONS extensions.
+    pub fn extend_dispute(ctx: Context<ExtendDispute>) -> Result<()> {
+        instructions::extend_dispute::handler(ctx)
     }
 
     /// Transfer the beneficiary (payee) of a deal.

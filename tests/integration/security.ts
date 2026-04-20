@@ -13,7 +13,7 @@ import { expect } from "chai";
 import { setupBase, setupActors, BaseContext } from "../helpers/setup";
 import { setupTreasury } from "../helpers/treasury";
 import { createTestDeal } from "../helpers/deal";
-import { DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH } from "../helpers/constants";
+import { DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH } from "../helpers/constants";
 
 describe("security", () => {
   let ctx: BaseContext;
@@ -74,7 +74,7 @@ describe("security", () => {
 
     try {
       await ctx.program.methods
-        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey,
           buyer: buyer.publicKey,
@@ -187,7 +187,7 @@ describe("security", () => {
     const dealKeypair = Keypair.generate();
     try {
       await ctx.program.methods
-        .createDeal(DEAL_AMOUNT, FEE_BPS, new anchor.BN(-1), TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+        .createDeal(DEAL_AMOUNT, FEE_BPS, new anchor.BN(-1), TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey,
           buyer: buyer.publicKey,
@@ -212,7 +212,7 @@ describe("security", () => {
     const dealKeypair = Keypair.generate();
     try {
       await ctx.program.methods
-        .createDeal(DEAL_AMOUNT, FEE_BPS, new anchor.BN(366 * 24 * 3600), TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+        .createDeal(DEAL_AMOUNT, FEE_BPS, new anchor.BN(366 * 24 * 3600), TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey,
           buyer: buyer.publicKey,
@@ -236,7 +236,7 @@ describe("security", () => {
   it("accepts release_delay at exactly 365 days (boundary)", async () => {
     const dealKeypair = Keypair.generate();
     await ctx.program.methods
-      .createDeal(DEAL_AMOUNT, FEE_BPS, new anchor.BN(365 * 24 * 3600), TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+      .createDeal(DEAL_AMOUNT, FEE_BPS, new anchor.BN(365 * 24 * 3600), TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
       .accounts({
         deal: dealKeypair.publicKey,
         buyer: buyer.publicKey,
@@ -259,7 +259,7 @@ describe("security", () => {
     const dealKeypair = Keypair.generate();
     try {
       await ctx.program.methods
-        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, new anchor.BN(1800), DISPUTE_DELAY, METADATA_HASH, [])
+        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, new anchor.BN(1800), DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey,
           buyer: buyer.publicKey,
@@ -282,7 +282,7 @@ describe("security", () => {
   it("accepts deal with zero fees", async () => {
     const dealKeypair = Keypair.generate();
     await ctx.program.methods
-      .createDeal(DEAL_AMOUNT, new anchor.BN(0), RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+      .createDeal(DEAL_AMOUNT, new anchor.BN(0), RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
       .accounts({
         deal: dealKeypair.publicKey,
         buyer: buyer.publicKey,
@@ -305,7 +305,7 @@ describe("security", () => {
     const dealKeypair = Keypair.generate();
     try {
       await ctx.program.methods
-        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey,
           buyer: buyer.publicKey,
@@ -330,7 +330,7 @@ describe("security", () => {
     const dealKeypair = Keypair.generate();
     try {
       await ctx.program.methods
-        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, METADATA_HASH, [])
+        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, DISPUTE_RESOLUTION_WINDOW, METADATA_HASH, [])
         .accounts({
           deal: dealKeypair.publicKey,
           buyer: buyer.publicKey,

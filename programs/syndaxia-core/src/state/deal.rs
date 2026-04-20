@@ -17,8 +17,7 @@
 
 use anchor_lang::prelude::*;
 
-/// Maximum number of milestones per deal.
-pub const MAX_MILESTONES: usize = 8;
+use crate::constants::MAX_MILESTONES;
 
 /// A deal carries ALL its parameters — no global config, no mutable admin state.
 /// Once created, every field except `status`, `released_mask`, and `beneficiary`
@@ -52,6 +51,15 @@ pub struct Deal {
     /// Seconds after deal creation before a dispute can be opened.
     /// Set per deal by the marketplace; 0 = instant disputes allowed.
     pub dispute_delay: i64,
+    /// Seconds the validator has to resolve a dispute after it is opened.
+    /// Set by the marketplace at deal creation. Range: 1 day – 365 days.
+    pub dispute_resolution_window: i64,
+    /// Unix timestamp when the dispute was opened (0 if never disputed).
+    /// Used to compute the validator's resolution deadline: disputed_at + dispute_resolution_window.
+    pub disputed_at: i64,
+    /// Number of times the validator can still extend the dispute resolution window.
+    /// Set at deal creation (default: MAX_DISPUTE_EXTENSIONS). Decremented on each extension.
+    pub dispute_extensions_remaining: u8,
     /// Current deal status.
     pub status: Status,
     /// Number of milestones (0 = simple deal, >0 = milestone deal).
@@ -65,7 +73,8 @@ pub struct Deal {
 
 impl Deal {
     /// Account size: 8 (discriminator) + fields.
-    pub const SPACE: usize = 8 + 32 + 32 + 32 + 32 + 32 + 8 + 8 + 32 + 8 + 8 + 8 + 8 + 1 + 1 + 1 + 64;
+    /// +1 for dispute_extensions_remaining (u8)
+    pub const SPACE: usize = 8 + 32 + 32 + 32 + 32 + 32 + 8 + 8 + 32 + 8 + 8 + 8 + 8 + 8 + 8 + 1 + 1 + 1 + 1 + 64;
 
     /// Returns true if all milestones have been released.
     pub fn all_milestones_released(&self) -> bool {
@@ -74,6 +83,26 @@ impl Deal {
         }
         let mask = (1u8 << self.milestone_count) - 1;
         self.released_mask & mask == mask
+    }
+
+    /// Returns the amount still held in escrow after partial milestone releases.
+    /// For simple deals (no milestones), this is always `self.amount`.
+    /// For milestone deals, it subtracts all already-released milestone amounts.
+    pub fn remaining_escrow_amount(&self) -> core::result::Result<u64, &'static str> {
+        if self.milestone_count == 0 {
+            return Ok(self.amount);
+        }
+        let mut released_total: u64 = 0;
+        for i in 0..self.milestone_count as usize {
+            if self.released_mask & (1u8 << i) != 0 {
+                released_total = released_total
+                    .checked_add(self.milestone_amounts[i])
+                    .ok_or("Math overflow in released_total")?;
+            }
+        }
+        self.amount
+            .checked_sub(released_total)
+            .ok_or("Released total exceeds deal amount")
     }
 }
 

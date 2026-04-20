@@ -1,0 +1,244 @@
+name: Syndaxia – Build, Test & Deploy
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  ANCHOR_VERSION: "0.32.0"
+  SOLANA_VERSION: "1.18.26"
+  RUST_TOOLCHAIN: "1.79.0"
+  NODE_VERSION: "20"
+
+jobs:
+  # ─────────────────────────────────────────────
+  # 1. Build & Test (runs on every push/PR)
+  # ─────────────────────────────────────────────
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout syndaxia-core
+        uses: actions/checkout@v4
+
+      - name: Checkout syndaxia-treasury
+        uses: actions/checkout@v4
+        with:
+          repository: Syndaxia-org/syndaxia-treasury
+          path: syndaxia-treasury
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+            syndaxia-treasury/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Install Anchor CLI
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor --tag v${{ env.ANCHOR_VERSION }} anchor-cli --locked
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Generate deployer keypair (test only)
+        run: solana-keygen new --no-bip39-passphrase -o ~/.config/solana/id.json
+
+      # Build treasury first (its .so is needed for core's test validator)
+      - name: Build syndaxia-treasury
+        run: |
+          cd syndaxia-treasury
+          anchor build
+          # Copy treasury .so into core's target so Anchor.toml [programs.localnet] resolves
+          mkdir -p ../target/deploy
+          cp target/deploy/syndaxia_treasury.so ../target/deploy/
+          cp target/deploy/syndaxia_treasury-keypair.json ../target/deploy/ 2>/dev/null || true
+
+      - name: Build & test syndaxia-core
+        run: anchor test
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: program-builds
+          path: |
+            target/deploy/syndaxia_core.so
+            target/deploy/syndaxia_treasury.so
+          retention-days: 7
+
+      - name: Compute build checksums
+        run: |
+          sha256sum target/deploy/syndaxia_core.so
+          sha256sum target/deploy/syndaxia_treasury.so
+
+  # ─────────────────────────────────────────────
+  # 2. Deploy to Devnet (on push to develop)
+  # ─────────────────────────────────────────────
+  deploy-devnet:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: devnet
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Install Anchor CLI
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor --tag v${{ env.ANCHOR_VERSION }} anchor-cli --locked
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: program-builds
+          path: target/deploy/
+
+      - name: Configure Solana for devnet
+        run: |
+          solana config set --url "${{ secrets.SOLANA_RPC_URL }}"
+          echo '${{ secrets.DEPLOYER_KEYPAIR }}' > /tmp/deployer.json
+          solana config set --keypair /tmp/deployer.json
+
+      - name: Write program keypairs
+        run: |
+          echo '${{ secrets.PROGRAM_KEYPAIR_TREASURY }}' > /tmp/treasury-keypair.json
+          echo '${{ secrets.PROGRAM_KEYPAIR_CORE }}' > /tmp/core-keypair.json
+
+      - name: Deploy Treasury (upgradeable)
+        run: |
+          solana program deploy \
+            --program-id /tmp/treasury-keypair.json \
+            --keypair /tmp/deployer.json \
+            target/deploy/syndaxia_treasury.so
+
+      - name: Deploy Core (final → immutable)
+        run: |
+          # Deploy first
+          solana program deploy \
+            --program-id /tmp/core-keypair.json \
+            --keypair /tmp/deployer.json \
+            target/deploy/syndaxia_core.so
+
+          # Revoke upgrade authority → IMMUTABLE
+          # ⚠️  Uncomment only when you're 100% sure
+          # solana program set-upgrade-authority \
+          #   $(solana address -k /tmp/core-keypair.json) \
+          #   --final
+
+      - name: Verify deployment
+        run: |
+          echo "=== Core Program ==="
+          solana program show $(solana address -k /tmp/core-keypair.json)
+          echo "=== Treasury Program ==="
+          solana program show $(solana address -k /tmp/treasury-keypair.json)
+
+      - name: Cleanup secrets
+        if: always()
+        run: |
+          rm -f /tmp/deployer.json /tmp/core-keypair.json /tmp/treasury-keypair.json
+
+  # ─────────────────────────────────────────────
+  # 3. Deploy to Mainnet (manual trigger, protected)
+  # ─────────────────────────────────────────────
+  deploy-mainnet:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: mainnet-production  # ← Requires manual approval
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Install Anchor CLI
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor --tag v${{ env.ANCHOR_VERSION }} anchor-cli --locked
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: program-builds
+          path: target/deploy/
+
+      - name: Configure Solana for mainnet
+        run: |
+          solana config set --url ${{ secrets.SOLANA_RPC_URL }}
+          echo '${{ secrets.DEPLOYER_KEYPAIR }}' > /tmp/deployer.json
+          solana config set --keypair /tmp/deployer.json
+
+      - name: Write program keypairs
+        run: |
+          echo '${{ secrets.PROGRAM_KEYPAIR_TREASURY }}' > /tmp/treasury-keypair.json
+          echo '${{ secrets.PROGRAM_KEYPAIR_CORE }}' > /tmp/core-keypair.json
+
+      - name: Check deployer balance
+        run: |
+          BALANCE=$(solana balance /tmp/deployer.json | awk '{print $1}')
+          echo "Deployer balance: $BALANCE SOL"
+          # Fail if less than 3 SOL
+          python3 -c "assert float('$BALANCE') >= 3.0, f'Insufficient balance: {$BALANCE} SOL'"
+
+      - name: Deploy Treasury
+        run: |
+          solana program deploy \
+            --program-id /tmp/treasury-keypair.json \
+            --keypair /tmp/deployer.json \
+            target/deploy/syndaxia_treasury.so
+
+      - name: Transfer Treasury authority to Squads multisig
+        run: |
+          # Transfer upgrade authority to Squads multisig vault
+          solana program set-upgrade-authority \
+            $(solana address -k /tmp/treasury-keypair.json) \
+            --new-upgrade-authority ${{ secrets.SQUADS_MULTISIG_VAULT }}
+
+      - name: Deploy Core (IMMUTABLE)
+        run: |
+          solana program deploy \
+            --program-id /tmp/core-keypair.json \
+            --keypair /tmp/deployer.json \
+            target/deploy/syndaxia_core.so
+
+          # Make IMMUTABLE immediately
+          solana program set-upgrade-authority \
+            $(solana address -k /tmp/core-keypair.json) \
+            --final
+
+      - name: Verify deployments
+        run: |
+          echo "=== Core Program (should show: none as authority) ==="
+          solana program show $(solana address -k /tmp/core-keypair.json)
+          echo "=== Treasury Program (should show: Squads vault) ==="
+          solana program show $(solana address -k /tmp/treasury-keypair.json)
+
+      - name: Cleanup secrets
+        if: always()
+        run: |
+          rm -f /tmp/deployer.json /tmp/core-keypair.json /tmp/treasury-keypair.json

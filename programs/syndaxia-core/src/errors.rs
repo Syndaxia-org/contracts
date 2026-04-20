@@ -77,10 +77,22 @@ pub enum SyndaxiaError {
     DisputeTooEarly,
     #[msg("Dispute delay is invalid (negative or exceeds 365 days).")]
     InvalidDisputeDelay,
+    #[msg("Dispute resolution window is invalid (must be between 1 day and 365 days).")]
+    InvalidDisputeResolutionWindow,
     #[msg("Protocol fee from Treasury exceeds the hardcoded maximum (20 BPS).")]
     InvalidProtocolFee,
     #[msg("Treasury token account does not match the treasury config fee_receiver.")]
     InvalidTreasuryTokenAccount,
     #[msg("Treasury config account data is invalid or corrupted.")]
     InvalidTreasuryConfig,
+    #[msg("Validator and seller cannot be the same address.")]
+    ValidatorEqualsSeller,
+    #[msg("New beneficiary cannot be the validator.")]
+    BeneficiaryEqualsValidator,
+    #[msg("Timeout exceeds the maximum allowed (365 days).")]
+    TimeoutTooLong,
+    #[msg("No dispute extensions remaining.")]
+    NoExtensionsRemaining,
+    #[msg("Total dispute resolution time would exceed the maximum allowed.")]
+    DisputeExtensionTooLong,
 }
