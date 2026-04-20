@@ -57,9 +57,6 @@ jobs:
       - name: Ensure Solana SBF tools are on PATH
         run: |
           echo "/root/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
-          if ! cargo --list | grep -q "build-sbf"; then
-            cargo install cargo-build-sbf --version 4.0.0
-          fi
           cargo --list | grep -q "build-sbf"
 
       - name: Install JS dependencies
