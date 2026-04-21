@@ -26,12 +26,16 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Rust stable toolchain
+# Install Rust stable toolchain + 1.84.x (last version generating v3 lockfiles)
+# We need 1.84 to pre-generate Cargo.lock in v3 format so the Solana BPF toolchain
+# (which bundles a pre-1.85 cargo) can parse it.  The workspace uses edition 2021
+# which will NOT auto-upgrade an existing v3 lockfile to v4.
 ENV CARGO_HOME=/root/.cargo
 ENV RUSTUP_HOME=/root/.rustup
 ENV PATH="${CARGO_HOME}/bin:${PATH}"
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
     && rustup toolchain install stable \
+    && rustup toolchain install 1.84 \
     && rustup default stable
 
 # Install Solana CLI
