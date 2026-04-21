@@ -95,8 +95,40 @@ jobs:
       - name: Build syndaxia-core (BPF)
         run: anchor build
 
-      - name: Run tests (skip build, validator already has .so files)
-        run: anchor test --skip-build
+      - name: Start local test validator
+        run: |
+          mkdir -p .anchor/test-ledger
+          solana config set --url http://127.0.0.1:8899
+          solana-test-validator \
+            --reset \
+            --ledger .anchor/test-ledger \
+            --mint ~/.config/solana/id.json \
+            --bpf-program FnzdhUJf3YKmQhSWVQD3Qr9jKu4DjnWEMWiNypX43f1x target/deploy/syndaxia_core.so \
+            --bpf-program D8H3JetPqdFasLXGbAqjhrrArfoYmy8PwQtt8KehZLxd target/deploy/syndaxia_treasury.so \
+            > .anchor/test-ledger/test-ledger-log.txt 2>&1 &
+          echo $! > .anchor/test-ledger/validator.pid
+
+          # Wait until RPC is ready before running tests.
+          for i in $(seq 1 180); do
+            if solana block-height >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "Validator did not become ready in time"
+          tail -n 200 .anchor/test-ledger/test-ledger-log.txt || true
+          exit 1
+
+      - name: Run tests (reuse running validator)
+        run: anchor test --skip-build --skip-deploy --skip-local-validator
+
+      - name: Stop local test validator
+        if: always()
+        run: |
+          if [ -f .anchor/test-ledger/validator.pid ]; then
+            kill "$(cat .anchor/test-ledger/validator.pid)" 2>/dev/null || true
+          fi
 
       - name: Upload test-ledger log on failure
         if: failure()
