@@ -16,7 +16,7 @@
 //   written consent from the Licensor (Association Syndaxia).
 
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
 use crate::constants::{
     MAX_DISPUTE_DELAY, MAX_DISPUTE_EXTENSIONS, MAX_DISPUTE_RESOLUTION_WINDOW, MAX_FEE_BPS,
@@ -30,7 +30,7 @@ use crate::state::{Deal, Status};
 #[derive(Accounts)]
 pub struct CreateDeal<'info> {
     #[account(init, payer = buyer, space = Deal::SPACE)]
-    pub deal: Account<'info, Deal>,
+    pub deal: Box<Account<'info, Deal>>,
     #[account(mut)]
     pub buyer: Signer<'info>,
     /// CHECK: stored in deal state as seller
@@ -38,11 +38,11 @@ pub struct CreateDeal<'info> {
     /// CHECK: stored in deal state as validator (arbitrator)
     pub validator: UncheckedAccount<'info>,
     #[account(mut, constraint = buyer_token_account.owner == buyer.key() @ SyndaxiaError::InvalidBuyerTokenAccount)]
-    pub buyer_token_account: Account<'info, TokenAccount>,
+    pub buyer_token_account: Box<Account<'info, TokenAccount>>,
     /// CHECK: stored in deal state as fee_collector
     pub fee_collector: UncheckedAccount<'info>,
     #[account(mut, constraint = fee_collector_token_account.owner == fee_collector.key() @ SyndaxiaError::InvalidFeeCollector)]
-    pub fee_collector_token_account: Account<'info, TokenAccount>,
+    pub fee_collector_token_account: Box<Account<'info, TokenAccount>>,
     /// Treasury config PDA (syndaxia-treasury program).
     /// Address verified via seeds ["treasury-config"] + TREASURY_PROGRAM_ID — no CPI type dependency.
     /// Data is read manually: fee_receiver @ offset 40, protocol_fee_bps @ offset 72.
@@ -56,13 +56,13 @@ pub struct CreateDeal<'info> {
     /// Token account that will receive the protocol fee.
     /// Owner verified in handler against treasury_config.fee_receiver (read from raw bytes).
     #[account(mut)]
-    pub treasury_token_account: Account<'info, TokenAccount>,
+    pub treasury_token_account: Box<Account<'info, TokenAccount>>,
     #[account(
         init, payer = buyer, seeds = [b"escrow", deal.key().as_ref()], bump,
         token::mint = mint, token::authority = escrow_token_account,
     )]
-    pub escrow_token_account: Account<'info, TokenAccount>,
-    pub mint: Account<'info, anchor_spl::token::Mint>,
+    pub escrow_token_account: Box<Account<'info, TokenAccount>>,
+    pub mint: Box<Account<'info, Mint>>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
