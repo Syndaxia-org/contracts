@@ -99,10 +99,11 @@ jobs:
         run: |
           mkdir -p .anchor/test-ledger
           solana config set --url http://127.0.0.1:8899
+          MINT_PUBKEY=$(solana address -k ~/.config/solana/id.json)
           solana-test-validator \
             --reset \
             --ledger .anchor/test-ledger \
-            --mint ~/.config/solana/id.json \
+            --mint "$MINT_PUBKEY" \
             --bpf-program FnzdhUJf3YKmQhSWVQD3Qr9jKu4DjnWEMWiNypX43f1x target/deploy/syndaxia_core.so \
             --bpf-program D8H3JetPqdFasLXGbAqjhrrArfoYmy8PwQtt8KehZLxd target/deploy/syndaxia_treasury.so \
             > .anchor/test-ledger/test-ledger-log.txt 2>&1 &
@@ -223,7 +224,7 @@ jobs:
   # ─────────────────────────────────────────────
   deploy-mainnet:
     needs: build-and-test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -256,7 +257,7 @@ jobs:
           BALANCE=$(solana balance /tmp/deployer.json | awk '{print $1}')
           echo "Deployer balance: $BALANCE SOL"
           # Fail if less than 3 SOL
-          python3 -c "assert float('$BALANCE') >= 3.0, f'Insufficient balance: {$BALANCE} SOL'"
+          python3 -c "import sys; b=float('$BALANCE'); assert b >= 3.0, f'Insufficient balance: {b} SOL'"
 
       - name: Deploy Treasury
         run: |
