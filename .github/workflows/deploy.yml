@@ -92,8 +92,19 @@ jobs:
           cp target/deploy/syndaxia_treasury.so ../target/deploy/
           cp target/deploy/syndaxia_treasury-keypair.json ../target/deploy/ 2>/dev/null || true
 
-      - name: Build & test syndaxia-core
-        run: anchor test
+      - name: Build syndaxia-core (BPF)
+        run: anchor build
+
+      - name: Run tests (skip build, validator already has .so files)
+        run: anchor test --skip-build
+
+      - name: Upload test-ledger log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-ledger-log
+          path: .anchor/test-ledger/test-ledger-log.txt
+          if-no-files-found: ignore
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
