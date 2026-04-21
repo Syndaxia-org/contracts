@@ -97,29 +97,57 @@ jobs:
 
       - name: Start local test validator
         run: |
-          mkdir -p .anchor/test-ledger
+          LEDGER_DIR=".anchor/test-ledger"
+          LOG_FILE="$LEDGER_DIR/test-ledger-log.txt"
+          PID_FILE="$LEDGER_DIR/validator.pid"
+
+          mkdir -p "$LEDGER_DIR"
+          : > "$LOG_FILE"
+
+          if ! command -v solana-test-validator >/dev/null 2>&1; then
+            echo "solana-test-validator not found in PATH" | tee -a "$LOG_FILE"
+            exit 1
+          fi
+
           solana config set --url http://127.0.0.1:8899
           MINT_PUBKEY=$(solana address -k ~/.config/solana/id.json)
           solana-test-validator \
             --reset \
-            --ledger .anchor/test-ledger \
+            --ledger "$LEDGER_DIR" \
             --mint "$MINT_PUBKEY" \
             --bpf-program FnzdhUJf3YKmQhSWVQD3Qr9jKu4DjnWEMWiNypX43f1x target/deploy/syndaxia_core.so \
             --bpf-program D8H3JetPqdFasLXGbAqjhrrArfoYmy8PwQtt8KehZLxd target/deploy/syndaxia_treasury.so \
-            > .anchor/test-ledger/test-ledger-log.txt 2>&1 &
-          echo $! > .anchor/test-ledger/validator.pid
+            > "$LOG_FILE" 2>&1 &
+          echo $! > "$PID_FILE"
+
+          # Fail fast if the validator crashes immediately.
+          sleep 2
+          if ! kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+            echo "Validator exited early" | tee -a "$LOG_FILE"
+            tail -n 200 "$LOG_FILE" || true
+            exit 1
+          fi
 
           # Wait until RPC is ready before running tests.
           for i in $(seq 1 180); do
             if solana block-height >/dev/null 2>&1; then
-              exit 0
+              break
+            fi
+            if ! kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+              echo "Validator exited before RPC became ready" | tee -a "$LOG_FILE"
+              tail -n 200 "$LOG_FILE" || true
+              exit 1
             fi
             sleep 1
           done
 
-          echo "Validator did not become ready in time"
-          tail -n 200 .anchor/test-ledger/test-ledger-log.txt || true
-          exit 1
+          if ! solana block-height >/dev/null 2>&1; then
+            echo "Validator did not become ready in time" | tee -a "$LOG_FILE"
+            tail -n 200 "$LOG_FILE" || true
+            exit 1
+          fi
+
+          echo "Validator is ready"
 
       - name: Run tests (reuse running validator)
         run: anchor test --skip-build --skip-deploy --skip-local-validator
