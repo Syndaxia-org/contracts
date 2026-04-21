@@ -3,10 +3,7 @@ name: Build CI Anchor Image
 on:
   workflow_dispatch:
   push:
-    branches: [main]
-    paths:
-      - .github/ci/Dockerfile.anchor
-      - .github/workflows/build-ci-image.yml
+    branches: [main]  # Always run on main so deploy.yml can gate on it via workflow_run
 
 permissions:
   contents: read

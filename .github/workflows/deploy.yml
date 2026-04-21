@@ -1,9 +1,16 @@
 name: Syndaxia – Build, Test & Deploy
 
 on:
+  # develop: trigger immediately (CI image doesn't change on develop pushes)
   push:
-    branches: [main, develop]
+    branches: [develop]
   pull_request:
+    branches: [main]
+  # main: wait for the CI image to be built/pushed before running.
+  # This avoids the race condition where deploy pulls a stale :latest image.
+  workflow_run:
+    workflows: ["Build CI Anchor Image"]
+    types: [completed]
     branches: [main]
 
 env:
@@ -17,6 +24,10 @@ jobs:
   # 1. Build & Test (runs on every push/PR)
   # ─────────────────────────────────────────────
   build-and-test:
+    # When triggered via workflow_run, only proceed if the image build succeeded.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
