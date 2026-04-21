@@ -14,8 +14,8 @@ on:
     branches: [main]
 
 env:
-  ANCHOR_VERSION: "0.32.0"
-  SOLANA_VERSION: "1.18.26"
+  ANCHOR_VERSION: "0.32.1"
+  SOLANA_VERSION: "3.1.13"
   RUST_TOOLCHAIN: "stable"
   NODE_VERSION: "20"
 
@@ -86,12 +86,6 @@ jobs:
         run: |
           cd syndaxia-treasury
           rm -f Cargo.lock
-          # Pre-generate Cargo.lock using Rust 1.84 (v3 format).
-          # The Solana 1.18.x BPF toolchain bundles a pre-1.85 cargo that cannot
-          # parse Cargo.lock v4 (the default since Rust 1.85).  Because this
-          # workspace uses edition 2021, Rust 1.85+ will NOT auto-upgrade a v3
-          # lockfile to v4, so the file generated here stays compatible.
-          cargo +1.84 generate-lockfile
           anchor build
           # Copy treasury .so into core's target so Anchor.toml [programs.localnet] resolves
           mkdir -p ../target/deploy
