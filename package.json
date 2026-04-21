@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.0",
-    "@sqds-multisig/sdk": "^2.1.4"
+    "@sqds/multisig": "^2.1.4"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.0",
