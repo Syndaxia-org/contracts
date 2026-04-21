@@ -7,10 +7,13 @@
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "init-treasury:devnet": "ts-node scripts/init-treasury.ts",
-    "init-treasury:mainnet": "ts-node scripts/init-treasury.ts"
+    "init-treasury:mainnet": "ts-node scripts/init-treasury.ts",
+    "squads:devnet": "RPC_URL=https://api.devnet.solana.com ts-node scripts/squads-treasury.ts",
+    "squads:mainnet": "RPC_URL=https://api.mainnet-beta.solana.com ts-node scripts/squads-treasury.ts"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.32.0"
+    "@coral-xyz/anchor": "^0.32.0",
+    "@sqds-multisig/sdk": "^2.1.4"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.0",
