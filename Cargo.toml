@@ -8,8 +8,10 @@ resolver = "2"
 overflow-checks = true
 lto = "fat"
 codegen-units = 1
+opt-level = "z"    # optimise pour la taille (vs "3" pour la vitesse) → -30% à -50%
+strip = "symbols"  # supprime les symboles de debug du .so final
 
 [profile.release.build-override]
-opt-level = 3
+opt-level = 3      # les scripts de build restent rapides
 incremental = false
 codegen-units = 1
