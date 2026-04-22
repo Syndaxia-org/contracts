@@ -9,7 +9,8 @@
     "init-treasury:devnet": "ts-node scripts/init-treasury.ts",
     "init-treasury:mainnet": "ts-node scripts/init-treasury.ts",
     "squads:devnet": "RPC_URL=https://api.devnet.solana.com ts-node scripts/squads-treasury.ts",
-    "squads:mainnet": "RPC_URL=https://api.mainnet-beta.solana.com ts-node scripts/squads-treasury.ts"
+    "squads:mainnet": "RPC_URL=https://api.mainnet-beta.solana.com ts-node scripts/squads-treasury.ts",
+    "e2e:devnet": "RPC_URL=https://api.devnet.solana.com ts-mocha -p ./tsconfig.json -t 120000 e2e/**/*.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.0",
