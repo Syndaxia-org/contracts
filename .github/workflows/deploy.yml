@@ -113,8 +113,12 @@ jobs:
 
           solana config set --url http://127.0.0.1:8899
           MINT_PUBKEY=$(solana address -k ~/.config/solana/id.json)
+          # --no-bpf-jit: required in GH Actions containers (no BPF JIT kernel capability)
+          # --limit-ledger-size: reduce disk I/O to avoid OOM in constrained env
           solana-test-validator \
             --reset \
+            --no-bpf-jit \
+            --limit-ledger-size 50000000 \
             --ledger "$LEDGER_DIR" \
             --mint "$MINT_PUBKEY" \
             --bpf-program FnzdhUJf3YKmQhSWVQD3Qr9jKu4DjnWEMWiNypX43f1x target/deploy/syndaxia_core.so \
@@ -123,9 +127,11 @@ jobs:
           echo $! > "$PID_FILE"
 
           # Fail fast if the validator crashes immediately.
-          sleep 2
+          sleep 5
           if ! kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
             echo "Validator exited early" | tee -a "$LOG_FILE"
+            # Also dump the validator's own internal log
+            cat "$LEDGER_DIR/validator.log" 2>/dev/null | tail -n 100 || true
             tail -n 200 "$LOG_FILE" || true
             exit 1
           fi
@@ -166,7 +172,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-ledger-log
-          path: .anchor/validator-state/test-ledger-log.txt
+          path: |
+            .anchor/validator-state/test-ledger-log.txt
+            .anchor/test-ledger/validator.log
           if-no-files-found: ignore
 
       - name: Upload build artifacts
