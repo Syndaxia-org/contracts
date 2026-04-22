@@ -212,6 +212,14 @@ jobs:
           name: program-builds
           path: target/deploy/
 
+      # Le build commun utilise l'adresse TREASURY_PROGRAM_ID devnet.
+      # On rebuilde le Core avec --features mainnet pour encoder l'adresse mainnet.
+      - name: Rebuild Core with mainnet feature flag
+        run: |
+          anchor build -- --features mainnet
+          echo "✓ Core rebuilt with TREASURY_PROGRAM_ID mainnet"
+          sha256sum target/deploy/syndaxia_core.so
+
       - name: Configure Solana for mainnet
         run: |
           solana config set --url ${{ secrets.SOLANA_RPC_URL }}
@@ -248,11 +256,16 @@ jobs:
 
       - name: Transfer Treasury authority to Squads multisig
         run: |
-          # Transfer upgrade authority to Squads multisig vault
-          solana program set-upgrade-authority \
-            $(solana address -k /tmp/treasury-keypair.json) \
-            --keypair /tmp/upgrade-authority.json \
-            --new-upgrade-authority ${{ secrets.SQUADS_MULTISIG_VAULT }}
+          if [ -n '${{ secrets.SQUADS_MULTISIG_VAULT }}' ]; then
+            solana program set-upgrade-authority \
+              $(solana address -k /tmp/treasury-keypair.json) \
+              --keypair /tmp/upgrade-authority.json \
+              --new-upgrade-authority ${{ secrets.SQUADS_MULTISIG_VAULT }}
+            echo "✓ Treasury upgrade authority transférée au vault Squads"
+          else
+            echo "⚠️  SQUADS_MULTISIG_VAULT non défini — authority conservée par UPGRADE_AUTHORITY_KEYPAIR"
+            echo "   À faire manuellement après création du multisig Squads mainnet."
+          fi
 
       - name: Deploy Core (upgradeable initially)
         run: |
@@ -264,10 +277,15 @@ jobs:
 
           # Transfer Core upgrade authority to Squads multisig
           # This keeps the program upgradeable but only via N/M multisig approval
-          solana program set-upgrade-authority \
-            $(solana address -k /tmp/core-keypair.json) \
-            --keypair /tmp/upgrade-authority.json \
-            --new-upgrade-authority ${{ secrets.SQUADS_MULTISIG_VAULT }}
+          if [ -n '${{ secrets.SQUADS_MULTISIG_VAULT }}' ]; then
+            solana program set-upgrade-authority \
+              $(solana address -k /tmp/core-keypair.json) \
+              --keypair /tmp/upgrade-authority.json \
+              --new-upgrade-authority ${{ secrets.SQUADS_MULTISIG_VAULT }}
+            echo "✓ Core upgrade authority transférée au vault Squads"
+          else
+            echo "⚠️  SQUADS_MULTISIG_VAULT non défini — authority conservée par UPGRADE_AUTHORITY_KEYPAIR"
+          fi
 
       - name: Verify deployments
         run: |
