@@ -98,10 +98,12 @@ jobs:
       - name: Start local test validator
         run: |
           LEDGER_DIR=".anchor/test-ledger"
-          LOG_FILE="$LEDGER_DIR/test-ledger-log.txt"
-          PID_FILE="$LEDGER_DIR/validator.pid"
+          STATE_DIR=".anchor/validator-state"
+          LOG_FILE="$STATE_DIR/test-ledger-log.txt"
+          PID_FILE="$STATE_DIR/validator.pid"
 
           mkdir -p "$LEDGER_DIR"
+          mkdir -p "$STATE_DIR"
           : > "$LOG_FILE"
 
           if ! command -v solana-test-validator >/dev/null 2>&1; then
@@ -155,8 +157,8 @@ jobs:
       - name: Stop local test validator
         if: always()
         run: |
-          if [ -f .anchor/test-ledger/validator.pid ]; then
-            kill "$(cat .anchor/test-ledger/validator.pid)" 2>/dev/null || true
+          if [ -f .anchor/validator-state/validator.pid ]; then
+            kill "$(cat .anchor/validator-state/validator.pid)" 2>/dev/null || true
           fi
 
       - name: Upload test-ledger log on failure
@@ -164,7 +166,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-ledger-log
-          path: .anchor/test-ledger/test-ledger-log.txt
+          path: .anchor/validator-state/test-ledger-log.txt
           if-no-files-found: ignore
 
       - name: Upload build artifacts
