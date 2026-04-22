@@ -12,6 +12,13 @@ on:
     workflows: ["Build CI Anchor Image"]
     types: [completed]
     branches: [main]
+  # Manual trigger for mainnet deploy
+  workflow_dispatch:
+    inputs:
+      deploy_mainnet:
+        description: 'Deploy to mainnet (requires mainnet-production approval)'
+        required: true
+        default: 'true'
 
 env:
   ANCHOR_VERSION: "0.32.1"
@@ -195,7 +202,9 @@ jobs:
   # ─────────────────────────────────────────────
   deploy-mainnet:
     needs: build-and-test
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    if: >
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_mainnet == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: read
