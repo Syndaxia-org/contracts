@@ -142,6 +142,14 @@ jobs:
           echo '${{ secrets.DEPLOYER_KEYPAIR }}' > /tmp/deployer.json
           solana config set --keypair /tmp/deployer.json
 
+      - name: Resolve upgrade authority signer (devnet)
+        run: |
+          if [ -n '${{ secrets.UPGRADE_AUTHORITY_KEYPAIR }}' ]; then
+            echo '${{ secrets.UPGRADE_AUTHORITY_KEYPAIR }}' > /tmp/upgrade-authority.json
+          else
+            cp /tmp/deployer.json /tmp/upgrade-authority.json
+          fi
+
       - name: Write program keypairs
         run: |
           echo '${{ secrets.PROGRAM_KEYPAIR_TREASURY }}' > /tmp/treasury-keypair.json
@@ -152,6 +160,7 @@ jobs:
           solana program deploy \
             --program-id /tmp/treasury-keypair.json \
             --keypair /tmp/deployer.json \
+            --upgrade-authority /tmp/upgrade-authority.json \
             target/deploy/syndaxia_treasury.so
 
       - name: Deploy Core (final → immutable)
@@ -160,6 +169,7 @@ jobs:
           solana program deploy \
             --program-id /tmp/core-keypair.json \
             --keypair /tmp/deployer.json \
+            --upgrade-authority /tmp/upgrade-authority.json \
             target/deploy/syndaxia_core.so
 
           # Revoke upgrade authority → IMMUTABLE
@@ -178,7 +188,7 @@ jobs:
       - name: Cleanup secrets
         if: always()
         run: |
-          rm -f /tmp/deployer.json /tmp/core-keypair.json /tmp/treasury-keypair.json
+          rm -f /tmp/deployer.json /tmp/upgrade-authority.json /tmp/core-keypair.json /tmp/treasury-keypair.json
 
   # ─────────────────────────────────────────────
   # 3. Deploy to Mainnet (manual trigger, protected)
@@ -208,6 +218,14 @@ jobs:
           echo '${{ secrets.DEPLOYER_KEYPAIR }}' > /tmp/deployer.json
           solana config set --keypair /tmp/deployer.json
 
+      - name: Resolve upgrade authority signer (mainnet)
+        run: |
+          if [ -n '${{ secrets.UPGRADE_AUTHORITY_KEYPAIR }}' ]; then
+            echo '${{ secrets.UPGRADE_AUTHORITY_KEYPAIR }}' > /tmp/upgrade-authority.json
+          else
+            cp /tmp/deployer.json /tmp/upgrade-authority.json
+          fi
+
       - name: Write program keypairs
         run: |
           echo '${{ secrets.PROGRAM_KEYPAIR_TREASURY }}' > /tmp/treasury-keypair.json
@@ -225,6 +243,7 @@ jobs:
           solana program deploy \
             --program-id /tmp/treasury-keypair.json \
             --keypair /tmp/deployer.json \
+            --upgrade-authority /tmp/upgrade-authority.json \
             target/deploy/syndaxia_treasury.so
 
       - name: Transfer Treasury authority to Squads multisig
@@ -232,6 +251,7 @@ jobs:
           # Transfer upgrade authority to Squads multisig vault
           solana program set-upgrade-authority \
             $(solana address -k /tmp/treasury-keypair.json) \
+            --keypair /tmp/upgrade-authority.json \
             --new-upgrade-authority ${{ secrets.SQUADS_MULTISIG_VAULT }}
 
       - name: Deploy Core (upgradeable initially)
@@ -239,12 +259,14 @@ jobs:
           solana program deploy \
             --program-id /tmp/core-keypair.json \
             --keypair /tmp/deployer.json \
+            --upgrade-authority /tmp/upgrade-authority.json \
             target/deploy/syndaxia_core.so
 
           # Transfer Core upgrade authority to Squads multisig
           # This keeps the program upgradeable but only via N/M multisig approval
           solana program set-upgrade-authority \
             $(solana address -k /tmp/core-keypair.json) \
+            --keypair /tmp/upgrade-authority.json \
             --new-upgrade-authority ${{ secrets.SQUADS_MULTISIG_VAULT }}
 
       - name: Verify deployments
@@ -257,4 +279,4 @@ jobs:
       - name: Cleanup secrets
         if: always()
         run: |
-          rm -f /tmp/deployer.json /tmp/core-keypair.json /tmp/treasury-keypair.json
+          rm -f /tmp/deployer.json /tmp/upgrade-authority.json /tmp/core-keypair.json /tmp/treasury-keypair.json
