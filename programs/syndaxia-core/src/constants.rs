@@ -68,7 +68,7 @@ pub const MAX_PROTOCOL_FEE_BPS: u64 = 20;
 pub const TREASURY_PROGRAM_ID: Pubkey = pubkey!("D8H3JetPqdFasLXGbAqjhrrArfoYmy8PwQtt8KehZLxd");
 
 #[cfg(feature = "mainnet")]
-pub const TREASURY_PROGRAM_ID: Pubkey = pubkey!("REMPLACER_PAR_ADRESSE_TREASURY_MAINNET");
+pub const TREASURY_PROGRAM_ID: Pubkey = pubkey!("DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx");
 
 /// Seeds for the TreasuryConfig PDA — must match the constant in syndaxia-treasury.
 pub const TREASURY_CONFIG_SEED: &[u8] = b"treasury-config";
