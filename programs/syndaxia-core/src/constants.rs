@@ -55,7 +55,20 @@ pub const MAX_PROTOCOL_FEE_BPS: u64 = 20;
 
 /// The Program ID of syndaxia-treasury. Used to derive and verify the TreasuryConfig PDA.
 /// Hardcoded here so no caller can substitute a fake treasury account.
+///
+/// Build devnet  : `anchor build`                        (default)
+/// Build mainnet : `anchor build --features mainnet`
+///
+/// Pour obtenir l'adresse mainnet :
+///   1. Générer le keypair treasury mainnet : `solana-keygen new -o .keys/treasury-mainnet.json`
+///   2. Lire l'adresse : `solana-keygen pubkey .keys/treasury-mainnet.json`
+///   3. Remplacer REMPLACER_PAR_ADRESSE_TREASURY_MAINNET ci-dessous
+///   4. Rebuild core avec --features mainnet puis déployer
+#[cfg(not(feature = "mainnet"))]
 pub const TREASURY_PROGRAM_ID: Pubkey = pubkey!("D8H3JetPqdFasLXGbAqjhrrArfoYmy8PwQtt8KehZLxd");
+
+#[cfg(feature = "mainnet")]
+pub const TREASURY_PROGRAM_ID: Pubkey = pubkey!("REMPLACER_PAR_ADRESSE_TREASURY_MAINNET");
 
 /// Seeds for the TreasuryConfig PDA — must match the constant in syndaxia-treasury.
 pub const TREASURY_CONFIG_SEED: &[u8] = b"treasury-config";

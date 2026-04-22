@@ -55,7 +55,8 @@ pub struct CreateDeal<'info> {
     pub treasury_config: AccountInfo<'info>,
     /// Token account that will receive the protocol fee.
     /// Owner verified in handler against treasury_config.fee_receiver (read from raw bytes).
-    #[account(mut)]
+    /// Mint must match the deal mint — prevents cross-mint fee routing mistakes.
+    #[account(mut, constraint = treasury_token_account.mint == mint.key() @ SyndaxiaError::InvalidTreasuryTokenAccount)]
     pub treasury_token_account: Box<Account<'info, TokenAccount>>,
     #[account(
         init, payer = buyer, seeds = [b"escrow", deal.key().as_ref()], bump,
