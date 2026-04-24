@@ -1,11 +1,14 @@
-# Rust
+# Rust / Anchor — build artifacts at any depth
 target/
-Cargo.lock
 **/*.rs.bk
 *.pdb
-
-# Anchor
 .anchor/
+
+# Foundry (Tempo / Solidity)
+tempo/out/
+tempo/cache/
+tempo/lib/
+tempo/broadcast/
 
 # Node
 node_modules/
@@ -13,20 +16,27 @@ dist/
 build/
 *.tsbuildinfo
 
-# Environment
+# Environment — never commit secrets
 .env
 .env.local
 .env.*.local
 
-# IDE
+# Keypairs — never commit
+.keys/
+**/*-keypair.json
+
+# Internal docs/scripts (live in syndaxia-internal)
+docs/
+scripts/
+e2e/
+
+# IDE / OS
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 .DS_Store
-
-# OS
 Thumbs.db
 
 # Deployer keypairs - NEVER COMMIT

@@ -6,13 +6,7 @@ on:
     branches: [develop]
   pull_request:
     branches: [main]
-  # main: wait for the CI image to be built/pushed before running.
-  # This avoids the race condition where deploy pulls a stale :latest image.
-  workflow_run:
-    workflows: ["Build CI Anchor Image"]
-    types: [completed]
-    branches: [main]
-  # Manual trigger for mainnet deploy
+  # Mainnet: manual trigger only — never automatic
   workflow_dispatch:
     inputs:
       deploy_mainnet:
@@ -32,9 +26,7 @@ jobs:
   # ─────────────────────────────────────────────
   build-and-test:
     # When triggered via workflow_run, only proceed if the image build succeeded.
-    if: >-
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
+    if: github.event_name != 'workflow_run'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -149,14 +141,6 @@ jobs:
           echo '${{ secrets.DEPLOYER_KEYPAIR }}' > /tmp/deployer.json
           solana config set --keypair /tmp/deployer.json
 
-      - name: Resolve upgrade authority signer (devnet)
-        run: |
-          if [ -n '${{ secrets.UPGRADE_AUTHORITY_KEYPAIR }}' ]; then
-            echo '${{ secrets.UPGRADE_AUTHORITY_KEYPAIR }}' > /tmp/upgrade-authority.json
-          else
-            cp /tmp/deployer.json /tmp/upgrade-authority.json
-          fi
-
       - name: Write program keypairs
         run: |
           echo '${{ secrets.PROGRAM_KEYPAIR_TREASURY }}' > /tmp/treasury-keypair.json
@@ -167,7 +151,7 @@ jobs:
           solana program deploy \
             --program-id /tmp/treasury-keypair.json \
             --keypair /tmp/deployer.json \
-            --upgrade-authority /tmp/upgrade-authority.json \
+            --upgrade-authority /tmp/deployer.json \
             target/deploy/syndaxia_treasury.so
 
       - name: Deploy Core (final → immutable)
@@ -176,7 +160,7 @@ jobs:
           solana program deploy \
             --program-id /tmp/core-keypair.json \
             --keypair /tmp/deployer.json \
-            --upgrade-authority /tmp/upgrade-authority.json \
+            --upgrade-authority /tmp/deployer.json \
             target/deploy/syndaxia_core.so
 
           # Revoke upgrade authority → IMMUTABLE
@@ -202,9 +186,7 @@ jobs:
   # ─────────────────────────────────────────────
   deploy-mainnet:
     needs: build-and-test
-    if: >
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_mainnet == 'true')
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_mainnet == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -235,14 +217,6 @@ jobs:
           echo '${{ secrets.DEPLOYER_KEYPAIR }}' > /tmp/deployer.json
           solana config set --keypair /tmp/deployer.json
 
-      - name: Resolve upgrade authority signer (mainnet)
-        run: |
-          if [ -n '${{ secrets.UPGRADE_AUTHORITY_KEYPAIR }}' ]; then
-            echo '${{ secrets.UPGRADE_AUTHORITY_KEYPAIR }}' > /tmp/upgrade-authority.json
-          else
-            cp /tmp/deployer.json /tmp/upgrade-authority.json
-          fi
-
       - name: Write program keypairs
         run: |
           echo '${{ secrets.PROGRAM_KEYPAIR_TREASURY }}' > /tmp/treasury-keypair.json
@@ -257,43 +231,45 @@ jobs:
 
       - name: Deploy Treasury
         run: |
+          # Deploy with deployer as initial upgrade authority (has SOL for fees)
           solana program deploy \
             --program-id /tmp/treasury-keypair.json \
             --keypair /tmp/deployer.json \
-            --upgrade-authority /tmp/upgrade-authority.json \
+            --upgrade-authority /tmp/deployer.json \
             target/deploy/syndaxia_treasury.so
 
       - name: Transfer Treasury authority to Squads multisig
         run: |
           if [ -n '${{ secrets.SQUADS_MULTISIG_VAULT }}' ]; then
+            # Deployer is the current upgrade authority — it has SOL to pay fees
             solana program set-upgrade-authority \
               $(solana address -k /tmp/treasury-keypair.json) \
-              --keypair /tmp/upgrade-authority.json \
+              --keypair /tmp/deployer.json \
               --new-upgrade-authority ${{ secrets.SQUADS_MULTISIG_VAULT }}
             echo "✓ Treasury upgrade authority transférée au vault Squads"
           else
-            echo "⚠️  SQUADS_MULTISIG_VAULT non défini — authority conservée par UPGRADE_AUTHORITY_KEYPAIR"
-            echo "   À faire manuellement après création du multisig Squads mainnet."
+            echo "⚠️  SQUADS_MULTISIG_VAULT non défini — authority conservée par le deployer"
           fi
 
       - name: Deploy Core (upgradeable initially)
         run: |
+          # Deploy with deployer as initial upgrade authority (has SOL for fees)
           solana program deploy \
             --program-id /tmp/core-keypair.json \
             --keypair /tmp/deployer.json \
-            --upgrade-authority /tmp/upgrade-authority.json \
+            --upgrade-authority /tmp/deployer.json \
             target/deploy/syndaxia_core.so
 
           # Transfer Core upgrade authority to Squads multisig
-          # This keeps the program upgradeable but only via N/M multisig approval
+          # Deployer is the current upgrade authority — it has SOL to pay fees
           if [ -n '${{ secrets.SQUADS_MULTISIG_VAULT }}' ]; then
             solana program set-upgrade-authority \
               $(solana address -k /tmp/core-keypair.json) \
-              --keypair /tmp/upgrade-authority.json \
+              --keypair /tmp/deployer.json \
               --new-upgrade-authority ${{ secrets.SQUADS_MULTISIG_VAULT }}
             echo "✓ Core upgrade authority transférée au vault Squads"
           else
-            echo "⚠️  SQUADS_MULTISIG_VAULT non défini — authority conservée par UPGRADE_AUTHORITY_KEYPAIR"
+            echo "⚠️  SQUADS_MULTISIG_VAULT non défini — authority conservée par le deployer"
           fi
 
       - name: Verify deployments

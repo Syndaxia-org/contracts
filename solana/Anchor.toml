@@ -5,8 +5,8 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-syndaxia_core = "FnzdhUJf3YKmQhSWVQD3Qr9jKu4DjnWEMWiNypX43f1x"
-syndaxia_treasury = "D8H3JetPqdFasLXGbAqjhrrArfoYmy8PwQtt8KehZLxd"
+syndaxia_core = "ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1"
+syndaxia_treasury = "DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx"
 
 [registry]
 url = "https://api.apr.dev"

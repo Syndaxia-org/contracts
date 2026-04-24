@@ -26,7 +26,7 @@ pub mod state;
 
 use instructions::*;
 
-declare_id!("FnzdhUJf3YKmQhSWVQD3Qr9jKu4DjnWEMWiNypX43f1x");
+declare_id!("ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1");
 
 #[program]
 pub mod syndaxia_core {
