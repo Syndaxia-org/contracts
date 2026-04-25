@@ -46,7 +46,7 @@ jobs:
         run: npm ci
 
       - name: Generate Solana keypair
-        run: solana-keygen new --no-passphrase -o ~/.config/solana/id.json
+        run: solana-keygen new --no-bip39-passphrase --silent -o ~/.config/solana/id.json
 
       - name: Build programs
         working-directory: solana
