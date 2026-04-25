@@ -1,0 +1,859 @@
+{
+  "address": "DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx",
+  "metadata": {
+    "name": "syndaxia_treasury",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Syndaxia Protocol - Treasury & governance for protocol fees"
+  },
+  "instructions": [
+    {
+      "name": "apply_fee_change",
+      "docs": [
+        "Apply a pending fee change after the timelock has elapsed. Permissionless."
+      ],
+      "discriminator": [
+        231,
+        177,
+        92,
+        117,
+        249,
+        52,
+        195,
+        112
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "apply_fee_receiver_change",
+      "docs": [
+        "Apply a pending fee receiver change after the timelock. Permissionless."
+      ],
+      "discriminator": [
+        186,
+        13,
+        119,
+        108,
+        244,
+        50,
+        165,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_fee_change",
+      "docs": [
+        "Cancel a pending fee change proposal. Only the multisig can cancel."
+      ],
+      "discriminator": [
+        165,
+        43,
+        235,
+        63,
+        31,
+        103,
+        73,
+        132
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "multisig",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_fee_receiver_change",
+      "docs": [
+        "Cancel a pending fee receiver change. Only the multisig can cancel."
+      ],
+      "discriminator": [
+        219,
+        40,
+        60,
+        89,
+        77,
+        140,
+        16,
+        168
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "multisig",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Initialize the treasury. Called once by the Association Syndaxia multisig.",
+        "`fee_receiver` is the token account that will receive protocol fees."
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "multisig",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "fee_receiver",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "propose_fee_change",
+      "docs": [
+        "Propose a new protocol fee rate. Starts the 7-day timelock.",
+        "Only the multisig can call this."
+      ],
+      "discriminator": [
+        154,
+        198,
+        39,
+        207,
+        65,
+        0,
+        64,
+        239
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "multisig",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "new_fee_bps",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "propose_fee_receiver_change",
+      "docs": [
+        "Update the fee receiver token account. Only the multisig can call this.",
+        "Starts a 7-day timelock — use `apply_fee_receiver_change` after the delay."
+      ],
+      "discriminator": [
+        122,
+        35,
+        117,
+        209,
+        22,
+        191,
+        146,
+        91
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "multisig",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "new_fee_receiver",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "docs": [
+        "Withdraw accumulated protocol fees from the treasury token account to the fee_receiver.",
+        "Only the multisig can call this."
+      ],
+      "discriminator": [
+        183,
+        18,
+        70,
+        156,
+        148,
+        109,
+        161,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "multisig",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "treasury_token_account",
+          "docs": [
+            "Treasury's token account holding accumulated fees."
+          ],
+          "writable": true
+        },
+        {
+          "name": "fee_receiver_token_account",
+          "docs": [
+            "Destination — must match config.fee_receiver ownership."
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "TreasuryConfig",
+      "discriminator": [
+        124,
+        54,
+        212,
+        227,
+        213,
+        189,
+        168,
+        41
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "FeeChangeApplied",
+      "discriminator": [
+        29,
+        161,
+        73,
+        128,
+        118,
+        93,
+        106,
+        11
+      ]
+    },
+    {
+      "name": "FeeChangeCancelled",
+      "discriminator": [
+        161,
+        33,
+        166,
+        220,
+        65,
+        151,
+        132,
+        41
+      ]
+    },
+    {
+      "name": "FeeChangeProposed",
+      "discriminator": [
+        227,
+        197,
+        50,
+        240,
+        150,
+        215,
+        223,
+        243
+      ]
+    },
+    {
+      "name": "FeeReceiverChangeCancelled",
+      "discriminator": [
+        171,
+        105,
+        98,
+        164,
+        173,
+        2,
+        239,
+        158
+      ]
+    },
+    {
+      "name": "FeeReceiverChangeProposed",
+      "discriminator": [
+        48,
+        140,
+        104,
+        146,
+        186,
+        199,
+        119,
+        182
+      ]
+    },
+    {
+      "name": "FeeReceiverUpdated",
+      "discriminator": [
+        34,
+        167,
+        143,
+        95,
+        104,
+        84,
+        17,
+        200
+      ]
+    },
+    {
+      "name": "FeeWithdrawn",
+      "discriminator": [
+        167,
+        107,
+        0,
+        35,
+        67,
+        79,
+        125,
+        118
+      ]
+    },
+    {
+      "name": "TreasuryInitialized",
+      "discriminator": [
+        199,
+        73,
+        174,
+        205,
+        59,
+        145,
+        55,
+        179
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "FeeTooHigh",
+      "msg": "Proposed fee exceeds the maximum allowed (20 BPS = 0.20%)."
+    },
+    {
+      "code": 6001,
+      "name": "Unauthorized",
+      "msg": "Unauthorized: signer is not the governance multisig."
+    },
+    {
+      "code": 6002,
+      "name": "NoPendingProposal",
+      "msg": "No pending fee change proposal to apply or cancel."
+    },
+    {
+      "code": 6003,
+      "name": "TimelockNotElapsed",
+      "msg": "Timelock period has not elapsed yet."
+    },
+    {
+      "code": 6004,
+      "name": "MathOverflow",
+      "msg": "Arithmetic overflow."
+    },
+    {
+      "code": 6005,
+      "name": "InvalidAmount",
+      "msg": "Amount must be greater than zero."
+    },
+    {
+      "code": 6006,
+      "name": "InvalidTokenAccount",
+      "msg": "Treasury token account authority does not match the config PDA."
+    },
+    {
+      "code": 6007,
+      "name": "InvalidFeeReceiver",
+      "msg": "Fee receiver token account does not match config.fee_receiver."
+    },
+    {
+      "code": 6008,
+      "name": "NoPendingReceiverProposal",
+      "msg": "No pending fee receiver change proposal to apply or cancel."
+    }
+  ],
+  "types": [
+    {
+      "name": "FeeChangeApplied",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_fee_bps",
+            "type": "u64"
+          },
+          {
+            "name": "new_fee_bps",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeChangeCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cancelled_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeChangeProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposed_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_fee_bps",
+            "type": "u64"
+          },
+          {
+            "name": "executable_after",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeReceiverChangeCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cancelled_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeReceiverChangeProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposed_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_receiver",
+            "type": "pubkey"
+          },
+          {
+            "name": "executable_after",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeReceiverUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_receiver",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_receiver",
+            "type": "pubkey"
+          },
+          {
+            "name": "updated_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryConfig",
+      "docs": [
+        "Global treasury configuration. Singleton PDA — seeds: [\"treasury-config\"].",
+        "The `config` PDA is also the authority over the treasury token account,",
+        "so only the program can sign withdrawals via the PDA seeds."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "multisig",
+            "docs": [
+              "The multisig that controls governance actions (propose, cancel, withdraw)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_receiver",
+            "docs": [
+              "The wallet (owner) that should receive withdrawn protocol fees.",
+              "⚠️ BREAKING LAYOUT WARNING: syndaxia-core reads raw bytes at offsets",
+              "40..72 (fee_receiver) and 72..80 (protocol_fee_bps).",
+              "DO NOT reorder or insert fields before offset 80."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "protocol_fee_bps",
+            "docs": [
+              "Current active protocol fee in basis points (0–20 BPS)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "pending_fee_bps",
+            "docs": [
+              "Pending fee proposal (None if no proposal active)."
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "timelock_until",
+            "docs": [
+              "Unix timestamp after which the pending fee proposal can be applied."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "pending_fee_receiver",
+            "docs": [
+              "Pending fee_receiver change (None if no proposal active)."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "receiver_timelock_until",
+            "docs": [
+              "Unix timestamp after which the pending fee_receiver change can be applied."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed."
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "multisig",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_receiver",
+            "type": "pubkey"
+          },
+          {
+            "name": "initial_fee_bps",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

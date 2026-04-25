@@ -50,7 +50,11 @@ jobs:
 
       - name: Build programs
         working-directory: solana
-        run: rm -rf target/idl target/types && anchor build
+        run: |
+          rm -rf target/idl target/types
+          anchor build
+          # Treasury is a private repo — copy committed IDL fixture
+          cp tests/fixtures/syndaxia_treasury.json target/idl/syndaxia_treasury.json
 
       - name: Run tests
         working-directory: solana
