@@ -9,6 +9,7 @@
 | [Whitepaper](./whitepaper.md) | Vision, use cases, and economic model |
 | [Protocol](./protocol.md) | Smart contract technical reference |
 | [Architecture](./architecture.md) | Design principles and security standards |
+| [Agentic Commerce](./agentic-commerce.md) | Syndaxia as the settlement layer for AI agent economies |
 
 ## Quick Links
 
