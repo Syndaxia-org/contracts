@@ -58,6 +58,8 @@ Anyone can create a Syndaxia market by specifying:
 
 *Example: A market for local artisans with 2% fees and a local expert as validator.*
 
+This permissionless design extends naturally to **agentic marketplaces** — platforms where AI agents transact autonomously. Any agent runtime can deploy its own market, set its own validator logic (including automated arbitration agents), and define fee rules, without requiring permission from a central authority.
+
 ---
 
 ## 3. Security Standards

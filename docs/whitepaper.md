@@ -55,6 +55,7 @@ Funds flow directly from the buyer's wallet to a **Program Derived Address (PDA)
 - **C2C (Consumers):** Secure second-hand sales (marketplace-style, without a proprietary platform).
 - **B2B (Professionals):** Invoice payments at 30/60 days with funds locked on-chain as guarantee.
 - **Services:** Freelance engagements with funds released upon delivery of a milestone.
+- **Agentic Commerce:** AI agents acting as autonomous economic entities — renting compute, purchasing data streams, or paying verification agents — where each micro-task requires trustless, instant settlement. Traditional banking (T+2) and custodial platforms are incompatible with machine-speed execution; Syndaxia's sub-second finality and immutable logic make it the natural settlement layer for agent-to-agent transactions.
 
 ### Release Conditions
 

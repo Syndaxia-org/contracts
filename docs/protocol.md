@@ -96,11 +96,18 @@ The Core reads the current `protocol_fee_bps` by deserializing the treasury PDA 
 | Treasury decoupling | Core reads treasury via raw byte deserialization (no CPI) |
 | Arithmetic safety | All arithmetic uses checked Rust operations (`checked_mul`, `checked_div`) |
 
+The **No-Admin Policy** — the absence of any privileged account that can freeze escrows or alter release logic — is equally critical for agentic use cases: an AI agent computing its ROI in milliseconds cannot account for arbitrary human intervention in the settlement layer.
+
 ---
 
-## 6. Metadata & Proof of Debt
+## 6. Metadata & Proof of Work
 
-The `metadata_hash` field (SHA-256) cryptographically links the on-chain deal to its legal reality (invoice, service contract). This hash is required to generate the automated compliance certificate used for recovery or insurance.
+The `metadata_hash` field (SHA-256) cryptographically links the on-chain deal to its real-world counterpart:
+
+- **Human commerce:** an invoice, service contract, or delivery confirmation.
+- **Agentic commerce:** the hash of a produced output — a dataset, an oracle response, or a computed result. The `release()` instruction is conditioned on the technical validation of this proof, enabling fully automated settlement cycles with no human dispute required.
+
+This makes `metadata_hash` the bridge between off-chain work and on-chain payment, regardless of whether the counterparties are humans or autonomous agents.
 
 ---
 
