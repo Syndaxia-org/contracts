@@ -26,6 +26,18 @@ pub mod state;
 
 use instructions::*;
 
+#[cfg(not(feature = "no-entrypoint"))]
+use solana_security_txt::security_txt;
+
+#[cfg(not(feature = "no-entrypoint"))]
+security_txt! {
+    name: "syndaxia-core",
+    project_url: "https://syndaxia.org",
+    contacts: "email:security@syndaxia.org",
+    policy: "https://syndaxia.org/security",
+    source_code: "https://github.com/Syndaxia-org/contracts"
+}
+
 declare_id!("ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1");
 
 #[program]

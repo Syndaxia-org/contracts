@@ -22,3 +22,4 @@ mainnet = []
 [dependencies]
 anchor-lang = "0.32.0"
 anchor-spl = "0.32.0"
+solana-security-txt = "1.1.2"
