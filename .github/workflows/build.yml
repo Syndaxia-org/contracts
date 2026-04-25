@@ -50,7 +50,7 @@ jobs:
 
       - name: Build programs
         working-directory: solana
-        run: anchor build
+        run: rm -rf target/idl target/types && anchor build
 
       - name: Run tests
         working-directory: solana
