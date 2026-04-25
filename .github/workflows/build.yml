@@ -51,4 +51,4 @@ jobs:
 
       - name: Run tests
         working-directory: solana
-        run: anchor test --skip-local-validator
+        run: anchor test
