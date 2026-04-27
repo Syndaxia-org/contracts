@@ -36,13 +36,13 @@ The protocol is described in detail in the [Syndaxia Protocol Documentation](./d
 
 ## Repository Structure
 
-- [`programs/syndaxia_core`](./programs/syndaxia_core) contains the core Solana Anchor program implementing the escrow protocol.
+- [`solana/programs/syndaxia-core/`](./solana/programs/syndaxia-core) — Core Solana Anchor program: escrow lifecycle, milestones, dispute resolution.
 
-- [`src/`](./src) contains Rust implementation details and type definitions.
+- [`solana/programs/syndaxia-treasury/`](./solana/programs/syndaxia-treasury) — Treasury governance program: protocol fee rate and recipient with 7-day timelock.
 
-- [`tests/`](./tests) contains integration tests written in TypeScript/Mocha.
+- [`solana/tests/`](./solana/tests) — Integration tests written in TypeScript/Mocha.
 
-- [`docs/`](./docs) contains comprehensive technical documentation, including the [smart contract specification](./docs/CONTRACT.md), [security audit](./docs/SECURITY_AUDIT.md), and [architectural guidelines](./docs/Architecture%20Technique%20%26%20Guidelines%20_%20Syndaxia.md).
+- [`docs/`](./docs) — Technical documentation: [protocol reference](./docs/protocol.md), [security audit](./docs/SECURITY_AUDIT.md), [architecture guide](./docs/architecture.md), [whitepaper](./docs/whitepaper.md).
 
 ## Developers
 
@@ -85,7 +85,11 @@ npm run lint
 
 ## Program Details
 
-**Program ID**: `Hj3Zs6F1SBPwHKyvkQDZT5JeZuYHu7FBD3smcnFEDyRp`  
+| Program | Program ID (mainnet) |
+|---------|---------------------|
+| `syndaxia-core` | `ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1` |
+| `syndaxia-treasury` | `DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx` |
+
 **Framework**: Anchor 0.32.0  
 **Network**: Solana (localnet / devnet / mainnet)
 
@@ -109,8 +113,9 @@ The protocol itself (as defined in the smart contracts) is governed by the Synda
 
 ## Additional Resources
 
-- [Protocol Documentation](./docs/CONTRACT.md)
-- [Architecture Guide](./docs/Architecture%20Technique%20%26%20Guidelines%20_%20Syndaxia.md)
+- [Protocol Reference](./docs/protocol.md)
+- [Architecture Guide](./docs/architecture.md)
+- [Whitepaper](./docs/whitepaper.md)
 - [Security Audit](./docs/SECURITY_AUDIT.md)
 - [Syndaxia Association Website](https://syndaxia.org)
 - [Support & Integration](https://satflows.fr)

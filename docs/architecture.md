@@ -12,16 +12,21 @@ contracts/
 │   ├── Anchor.toml
 │   ├── Cargo.toml                  # workspace root
 │   ├── programs/
-│   │   └── syndaxia-core/          # The immutable "engine"
+│   │   ├── syndaxia-core/          # The immutable "engine"
+│   │   │   └── src/
+│   │   │       ├── lib.rs          # Entry point — instruction routing
+│   │   │       ├── state/          # Account definitions (Deal, Config)
+│   │   │       ├── instructions/   # One file per business domain
+│   │   │       │   ├── admin.rs    # Protocol initialization & config
+│   │   │       │   ├── market.rs   # Market & validator creation
+│   │   │       │   └── deal.rs     # Deal lifecycle: create, release, dispute
+│   │   │       ├── libraries/      # Safe math utilities
+│   │   │       └── errors.rs       # Centralized error codes
+│   │   └── syndaxia-treasury/      # Fee governance (rate + recipient, 7-day timelock)
 │   │       └── src/
-│   │           ├── lib.rs          # Entry point — instruction routing
-│   │           ├── state/          # Account definitions (Deal, Config)
-│   │           ├── instructions/   # One file per business domain
-│   │           │   ├── admin.rs    # Protocol initialization & config
-│   │           │   ├── market.rs   # Market & validator creation
-│   │           │   └── deal.rs     # Deal lifecycle: create, release, dispute
-│   │           ├── libraries/      # Safe math utilities
-│   │           └── errors.rs       # Centralized error codes
+│   │           ├── lib.rs          # Entry point — governance instructions
+│   │           ├── state.rs        # TreasuryConfig account definition
+│   │           └── errors.rs       # Error codes
 │   └── tests/                      # Integration tests (Anchor/Mocha)
 └── tempo/                          # Solidity placeholders (EVM future)
     ├── src/

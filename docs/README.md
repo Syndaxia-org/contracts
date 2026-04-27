@@ -9,11 +9,12 @@
 | [Whitepaper](./whitepaper.md) | Vision, use cases, and economic model |
 | [Protocol](./protocol.md) | Smart contract technical reference |
 | [Architecture](./architecture.md) | Design principles and security standards |
+| [Security Audit](./SECURITY_AUDIT.md) | Internal pre-release security review (Series A + B) |
 
 ## Quick Links
 
-- **Program ID (mainnet):** `ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1`
-- **Explorer:** [Solana Explorer](https://explorer.solana.com/address/ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1)
+- **syndaxia-core (mainnet):** `ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1` — [Explorer](https://explorer.solana.com/address/ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1)
+- **syndaxia-treasury (mainnet):** `DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx` — [Explorer](https://explorer.solana.com/address/DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx)
 - **Security:** [syndaxia.org/security](https://syndaxia.org/security)
 - **Contact:** security@syndaxia.org
 

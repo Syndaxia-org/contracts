@@ -4,7 +4,7 @@
 
 | Program | Version | Program ID |
 |---------|---------|------------|
-| `syndaxia-core` | v0.1.0 | `Hj3Zs6F1SBPwHKyvkQDZT5JeZuYHu7FBD3smcnFEDyRp` |
+| `syndaxia-core` | v0.1.0 | `ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1` |
 | `syndaxia-treasury` | v0.1.0 | `DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx` |
 
 **Blockchain**: Solana — Anchor 0.32.0  
@@ -380,7 +380,7 @@ deployment:
 | 🔴 Critical | Multisig administration via Squads Protocol |
 | 🟠 High | Public bug bounty program (e.g., Immunefi) |
 | 🟠 High | Fuzz testing with Trident or Honggfuzz |
-| 🟡 Medium | Verified build via `anchor verify` |
+| 🟡 Medium | Verified build via `solana-verify` (deterministic Docker build + OtterSec submission) |
 | 🟡 Medium | Public IDL documentation |
 
 ### Path to Immutability
@@ -410,6 +410,8 @@ Phase 3 — Immutability
 - [x] Anchor 0.32.0 (latest stable)
 - [x] No unnecessary dependencies
 - [x] No `unsafe` Rust
+- [x] `solana-security-txt` v1.1.2 embedded in both programs
+- [x] Deterministic verified build — `solanafoundation/solana-verifiable-build:3.1.10`
 
 ---
 
