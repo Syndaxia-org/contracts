@@ -18,9 +18,5 @@ wallet = "~/.config/solana/id.json"
 [test]
 startup_wait = 120000
 
-[[test.genesis]]
-address = "DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx"
-program = "tests/fixtures/syndaxia_treasury.so"
-
 [scripts]
 test = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

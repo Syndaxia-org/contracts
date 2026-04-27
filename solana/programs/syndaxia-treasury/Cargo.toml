@@ -1,0 +1,22 @@
+[package]
+name = "syndaxia-treasury"
+version = "0.1.0"
+description = "Syndaxia Protocol - Treasury & governance for protocol fees"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "syndaxia_treasury"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = "0.32.0"
+anchor-spl = "0.32.0"
+solana-security-txt = "1.1.2"
