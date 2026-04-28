@@ -18,7 +18,7 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     env:
-      RUSTUP_TOOLCHAIN: ${{ env.RUST_VERSION }}
+      RUSTUP_TOOLCHAIN: "1.85"
     steps:
       - uses: actions/checkout@v4
 
@@ -103,7 +103,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
-      RUSTUP_TOOLCHAIN: ${{ env.RUST_VERSION }}
+      RUSTUP_TOOLCHAIN: "1.85"
     steps:
       - uses: actions/checkout@v4
 
