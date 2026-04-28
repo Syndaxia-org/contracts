@@ -9,7 +9,7 @@ on:
 env:
   ANCHOR_VERSION: "0.32.1"
   SOLANA_VERSION: "3.1.11"   # ships platform-tools v1.53 (rustc 1.89) — required for anchor 0.32 / solana-program 2.3 (edition2024)
-  RUST_VERSION: "1.85"      # min for edition2024 (hashbrown 0.17, indexmap 2.14)
+  RUST_VERSION: "stable"    # anchor-syn 0.32.1 needs proc_macro::Span::local_file() stabilized in 1.88
 
 jobs:
   # ───────────────────────────────────────────────────────────────────
@@ -17,28 +17,23 @@ jobs:
   # ───────────────────────────────────────────────────────────────────
   build-and-test:
     runs-on: ubuntu-latest
-    env:
-      RUSTUP_TOOLCHAIN: "1.85"   # forces rustup proxy to use 1.85 in all `cargo` invocations
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust 1.85 (edition2024 required)
+      # anchor-syn 0.32.1 requires proc_macro::Span::local_file() → stabilized in Rust 1.88.0
+      # edition2024 (hashbrown 0.17) requires Cargo >= 1.85 → stable satisfies both
+      - name: Install Rust stable (≥1.88 required by anchor-syn 0.32)
         uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.85"
 
-      # GitHub runners ship a preinstalled cargo 1.84 in /usr/share/rust/.cargo/bin
-      # which can shadow rustup's proxy. Force ~/.cargo/bin first in PATH.
+      # Force ~/.cargo/bin ahead of preinstalled cargo 1.84 on GH runners
       - name: Force rustup proxy in PATH + verify versions
         run: |
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           export PATH="$HOME/.cargo/bin:$PATH"
-          rustup default 1.85
           echo "--- which ---"
           which cargo && which rustc
           echo "--- versions ---"
           rustc --version && cargo --version
-          rustup show
 
       - name: Cache Cargo bin (avm / anchor)
         id: cache-cargo-bin
@@ -110,20 +105,15 @@ jobs:
     needs: build-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    env:
-      RUSTUP_TOOLCHAIN: "1.85"
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust 1.85 (edition2024 required)
+      - name: Install Rust stable (≥1.88 required by anchor-syn 0.32)
         uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.85"
 
       - name: Force rustup proxy in PATH
         run: |
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          rustup default 1.85
           cargo --version
 
       - name: Cache Cargo bin (solana-verify)
@@ -131,7 +121,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin
-          key: cargo-bin-solana-verify-rust185-${{ runner.os }}
+          key: cargo-bin-solana-verify-stable-${{ runner.os }}
 
       - name: Install solana-verify CLI
         if: steps.cache-sv-bin.outputs.cache-hit != 'true'
