@@ -103,6 +103,16 @@ jobs:
         working-directory: solana
         run: anchor test --skip-build
 
+      - name: Upload IDL artifacts (for release job)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: idl-files
+          retention-days: 1
+          path: |
+            solana/target/idl/syndaxia_core.json
+            solana/target/idl/syndaxia_treasury.json
+
   # ───────────────────────────────────────────────────────────────────
   # 2. Verifiable build + release artifacts  (uniquement sur tag vX.Y.Z)
   # ───────────────────────────────────────────────────────────────────
@@ -134,6 +144,12 @@ jobs:
         if: steps.cache-sv-bin.outputs.cache-hit != 'true'
         run: cargo install solana-verify --locked
 
+      - name: Download IDL artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: idl-files
+          path: idl-download
+
       # core: --features mainnet active le TREASURY_PROGRAM_ID mainnet réel
       - name: Verifiable build — syndaxia-core (mainnet)
         working-directory: solana
@@ -162,10 +178,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG=${{ github.ref_name }}
-          cp solana/target/deploy/syndaxia_core.so     syndaxia_core-${TAG}.so
-          cp solana/target/deploy/syndaxia_treasury.so syndaxia_treasury-${TAG}.so
-          cp solana/target/idl/syndaxia_core.json      syndaxia_core-${TAG}.idl.json
-          cp solana/target/idl/syndaxia_treasury.json  syndaxia_treasury-${TAG}.idl.json
+          cp solana/target/deploy/syndaxia_core.so              syndaxia_core-${TAG}.so
+          cp solana/target/deploy/syndaxia_treasury.so          syndaxia_treasury-${TAG}.so
+          cp idl-download/solana/target/idl/syndaxia_core.json     syndaxia_core-${TAG}.idl.json
+          cp idl-download/solana/target/idl/syndaxia_treasury.json syndaxia_treasury-${TAG}.idl.json
           sha256sum syndaxia_core-${TAG}.so syndaxia_treasury-${TAG}.so > SHA256SUMS-${TAG}.txt
           gh release create ${TAG} \
             --title "Release ${TAG}" \
