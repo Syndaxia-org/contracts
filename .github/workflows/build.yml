@@ -17,18 +17,15 @@ jobs:
   # ───────────────────────────────────────────────────────────────────
   build-and-test:
     runs-on: ubuntu-latest
-    env:
-      RUSTUP_TOOLCHAIN: ${{ vars.RUST_VERSION }}
     steps:
       - uses: actions/checkout@v4
 
+      # rust-toolchain.toml at repo root pins channel = "1.85" — dtolnay reads it automatically
       - name: Install Rust (≥1.85 — edition2024 support)
         uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ vars.RUST_VERSION }}
 
-      - name: Set Rust default toolchain
-        run: rustup default ${{ vars.RUST_VERSION }} && cargo --version
+      - name: Check Rust version
+        run: cargo --version
 
       # Cache ~/.cargo/bin (avm + anchor binaries) keyed on version string.
       # Cache hit → both tools ready in <5 s. Miss → compile once, cached thereafter.
@@ -37,7 +34,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin
-          key: cargo-bin-avm-anchor-${{ env.ANCHOR_VERSION }}-rust-${{ vars.RUST_VERSION }}-${{ runner.os }}
+          key: cargo-bin-avm-anchor-${{ env.ANCHOR_VERSION }}-rust-${{ hashFiles('rust-toolchain.toml') }}-${{ runner.os }}
 
       # Cache registry + build artefacts separately (changes with Cargo.lock)
       - name: Cache Cargo registry & build
@@ -47,8 +44,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             solana/target/
-          key: ${{ runner.os }}-cargo-rust${{ vars.RUST_VERSION }}-${{ hashFiles('solana/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-rust${{ vars.RUST_VERSION }}-
+          key: ${{ runner.os }}-cargo-rust${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('solana/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-rust${{ hashFiles('rust-toolchain.toml') }}-
 
       - name: Install Solana CLI
         run: |
@@ -102,25 +99,22 @@ jobs:
     needs: build-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    env:
-      RUSTUP_TOOLCHAIN: ${{ vars.RUST_VERSION }}
     steps:
       - uses: actions/checkout@v4
 
+      # rust-toolchain.toml at repo root pins channel = "1.85" — dtolnay reads it automatically
       - name: Install Rust (≥1.85 — edition2024 support)
         uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ vars.RUST_VERSION }}
 
-      - name: Set Rust default toolchain
-        run: rustup default ${{ vars.RUST_VERSION }} && cargo --version
+      - name: Check Rust version
+        run: cargo --version
 
       - name: Cache Cargo bin (solana-verify)
         id: cache-sv-bin
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin
-          key: cargo-bin-solana-verify-rust-${{ vars.RUST_VERSION }}-${{ runner.os }}
+          key: cargo-bin-solana-verify-rust-${{ hashFiles('rust-toolchain.toml') }}-${{ runner.os }}
 
       - name: Install solana-verify CLI
         if: steps.cache-sv-bin.outputs.cache-hit != 'true'
