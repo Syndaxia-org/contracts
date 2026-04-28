@@ -127,22 +127,25 @@ jobs:
         if: steps.cache-sv-bin.outputs.cache-hit != 'true'
         run: cargo install solana-verify --locked
 
-      - name: Verifiable build — syndaxia-core
+      # core: --features mainnet active le TREASURY_PROGRAM_ID mainnet réel
+      - name: Verifiable build — syndaxia-core (mainnet)
         working-directory: solana
         run: |
           solana-verify build --library-name syndaxia_core \
-            -b solanafoundation/solana-verifiable-build:3.1.10
+            -b solanafoundation/solana-verifiable-build:3.1.10 \
+            -- --features mainnet
 
+      # treasury: pas de feature mainnet, même binaire pour tous les envs
       - name: Verifiable build — syndaxia-treasury
         working-directory: solana
         run: |
           solana-verify build --library-name syndaxia_treasury \
             -b solanafoundation/solana-verifiable-build:3.1.10
 
-      - name: Print verifiable checksums
+      - name: Print verifiable checksums (mainnet deployment artifacts)
         working-directory: solana
         run: |
-          echo "=== syndaxia-core ==="
+          echo "=== syndaxia-core (mainnet) ==="
           sha256sum target/deploy/syndaxia_core.so
           echo "=== syndaxia-treasury ==="
           sha256sum target/deploy/syndaxia_treasury.so
