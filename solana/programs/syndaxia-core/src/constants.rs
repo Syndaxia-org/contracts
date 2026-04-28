@@ -73,7 +73,7 @@ pub const MAX_PROTOCOL_FEE_BPS: u64 = 20;
 ///   3. Remplacer REMPLACER_PAR_ADRESSE_TREASURY_MAINNET ci-dessous
 ///   4. Rebuild core avec --features mainnet puis déployer
 #[cfg(not(feature = "mainnet"))]
-pub const TREASURY_PROGRAM_ID: Pubkey = pubkey!("D8H3JetPqdFasLXGbAqjhrrArfoYmy8PwQtt8KehZLxd");
+pub const TREASURY_PROGRAM_ID: Pubkey = pubkey!("DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx");
 
 #[cfg(feature = "mainnet")]
 pub const TREASURY_PROGRAM_ID: Pubkey = pubkey!("DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx");

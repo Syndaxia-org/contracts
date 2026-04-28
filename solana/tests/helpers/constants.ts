@@ -5,7 +5,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 
 export const TREASURY_PROGRAM_ID = new PublicKey(
-  "D8H3JetPqdFasLXGbAqjhrrArfoYmy8PwQtt8KehZLxd"
+  "DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx"
 );
 export const TREASURY_CONFIG_SEED = "treasury-config";
 
