@@ -110,6 +110,7 @@ jobs:
           cp solana/target/idl/syndaxia_core.json    idl-staging/
           cp solana/target/idl/syndaxia_treasury.json idl-staging/
 
+      - name: Upload IDL artifacts (for release job)
         if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with:
