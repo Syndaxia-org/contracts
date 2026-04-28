@@ -3,10 +3,9 @@ name: Build & Test
 on:
   push:
     branches: [main, develop]
+    tags: ['v*.*.*']    # push d'un tag git → verifiable build + création de la release
   pull_request:
     branches: [main, develop]
-  release:
-    types: [created]   # verifiable build + attach artifacts to release
 
 env:
   ANCHOR_VERSION: "0.32.1"
@@ -105,13 +104,13 @@ jobs:
         run: anchor test --skip-build
 
   # ───────────────────────────────────────────────────────────────────
-  # 2. Verifiable build + release artifacts  (only on GitHub Release)
+  # 2. Verifiable build + release artifacts  (uniquement sur tag vX.Y.Z)
   # ───────────────────────────────────────────────────────────────────
   solana-verify:
     needs: build-and-test
-    if: github.event_name == 'release'
+    if: startsWith(github.ref, 'refs/tags/')
     permissions:
-      contents: write   # required to upload assets to the release
+      contents: write   # required to create the release + upload assets
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -158,22 +157,21 @@ jobs:
           echo "=== syndaxia-treasury ==="
           sha256sum target/deploy/syndaxia_treasury.so
 
-      - name: Upload artifacts to GitHub Release
+      - name: Create GitHub Release and upload artifacts
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=${{ github.event.release.tag_name }}
-          # Rename .so with tag for clarity
+          TAG=${{ github.ref_name }}
           cp solana/target/deploy/syndaxia_core.so     syndaxia_core-${TAG}.so
           cp solana/target/deploy/syndaxia_treasury.so syndaxia_treasury-${TAG}.so
           cp solana/target/idl/syndaxia_core.json      syndaxia_core-${TAG}.idl.json
           cp solana/target/idl/syndaxia_treasury.json  syndaxia_treasury-${TAG}.idl.json
-          # Generate checksum file
           sha256sum syndaxia_core-${TAG}.so syndaxia_treasury-${TAG}.so > SHA256SUMS-${TAG}.txt
-          gh release upload ${TAG} \
+          gh release create ${TAG} \
+            --title "Release ${TAG}" \
+            --notes "Verifiable mainnet build — checksums dans SHA256SUMS-${TAG}.txt" \
             syndaxia_core-${TAG}.so \
             syndaxia_treasury-${TAG}.so \
             syndaxia_core-${TAG}.idl.json \
             syndaxia_treasury-${TAG}.idl.json \
-            SHA256SUMS-${TAG}.txt \
-            --clobber
+            SHA256SUMS-${TAG}.txt
