@@ -8,54 +8,121 @@ on:
 
 env:
   ANCHOR_VERSION: "0.32.1"
-  SOLANA_VERSION: "3.1.13"
-  RUST_TOOLCHAIN: "stable"
-  NODE_VERSION: "20"
+  SOLANA_VERSION: "2.2.14"   # anza.xyz stable — matches SBF toolchain used in verifiable build
 
 jobs:
+  # ───────────────────────────────────────────────────────────────────
+  # 1. Build & Test
+  # ───────────────────────────────────────────────────────────────────
   build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
+      - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
+      # Cache ~/.cargo/bin (avm + anchor binaries) keyed on version string.
+      # Cache hit → both tools ready in <5 s. Miss → compile once, cached thereafter.
+      - name: Cache Cargo bin (avm / anchor)
+        id: cache-cargo-bin
+        uses: actions/cache@v4
         with:
-          workspaces: solana
+          path: ~/.cargo/bin
+          key: cargo-bin-avm-anchor-${{ env.ANCHOR_VERSION }}-${{ runner.os }}
+
+      # Cache registry + build artefacts separately (changes with Cargo.lock)
+      - name: Cache Cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            solana/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('solana/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
 
       - name: Install Solana CLI
         run: |
           sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
 
-      - name: Install Anchor CLI
-        run: cargo install --git https://github.com/coral-xyz/anchor avm --locked --force && avm install ${{ env.ANCHOR_VERSION }} && avm use ${{ env.ANCHOR_VERSION }}
+      - name: Install Anchor CLI (via avm)
+        if: steps.cache-cargo-bin.outputs.cache-hit != 'true'
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+          avm install ${{ env.ANCHOR_VERSION }}
+          avm use ${{ env.ANCHOR_VERSION }}
 
-      - name: Setup Node ${{ env.NODE_VERSION }}
+      - name: Ensure anchor on PATH (cache hit path)
+        run: echo "$HOME/.avm/bin" >> "$GITHUB_PATH"
+
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: "20"
           cache: npm
           cache-dependency-path: solana/package-lock.json
 
-      - name: Install Node dependencies
+      - name: Install JS dependencies
         working-directory: solana
         run: npm ci
 
-      - name: Generate Solana keypair
+      - name: Generate throwaway keypair
         run: solana-keygen new --no-bip39-passphrase --silent -o ~/.config/solana/id.json
 
-      - name: Build programs
+      - name: Build programs (core + treasury)
         working-directory: solana
         run: |
           rm -rf target/idl target/types
           anchor build
-          # Treasury is a private repo — copy committed IDL fixture
-          cp tests/fixtures/syndaxia_treasury.json target/idl/syndaxia_treasury.json
+
+      - name: Print checksums
+        working-directory: solana
+        run: |
+          sha256sum target/deploy/syndaxia_core.so
+          sha256sum target/deploy/syndaxia_treasury.so
 
       - name: Run tests
         working-directory: solana
-        run: anchor test
+        run: anchor test --skip-build
+
+  # ───────────────────────────────────────────────────────────────────
+  # 2. Verifiable build  (only on push to main — Docker required)
+  # ───────────────────────────────────────────────────────────────────
+  solana-verify:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust (verify job)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: solana
+
+      - name: Install solana-verify CLI
+        run: cargo install solana-verify --locked
+
+      - name: Verifiable build — syndaxia-core
+        working-directory: solana
+        run: |
+          solana-verify build --library-name syndaxia_core \
+            -b solanafoundation/solana-verifiable-build:3.1.10
+
+      - name: Verifiable build — syndaxia-treasury
+        working-directory: solana
+        run: |
+          solana-verify build --library-name syndaxia_treasury \
+            -b solanafoundation/solana-verifiable-build:3.1.10
+
+      - name: Print verifiable checksums
+        working-directory: solana
+        run: |
+          echo "=== syndaxia-core ==="
+          sha256sum target/deploy/syndaxia_core.so
+          echo "=== syndaxia-treasury ==="
+          sha256sum target/deploy/syndaxia_treasury.so
