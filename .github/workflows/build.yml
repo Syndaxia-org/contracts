@@ -17,24 +17,29 @@ jobs:
   # ───────────────────────────────────────────────────────────────────
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: "1.85"   # forces rustup proxy to use 1.85 in all `cargo` invocations
     steps:
       - uses: actions/checkout@v4
 
-      # Install Rust 1.85 + set as global rustup default so it applies everywhere
-      # (including `cargo install` which builds in tmp dirs outside our checkout).
       - name: Install Rust 1.85 (edition2024 required)
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.85"
 
-      - name: Set Rust 1.85 as global default
+      # GitHub runners ship a preinstalled cargo 1.84 in /usr/share/rust/.cargo/bin
+      # which can shadow rustup's proxy. Force ~/.cargo/bin first in PATH.
+      - name: Force rustup proxy in PATH + verify versions
         run: |
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.cargo/bin:$PATH"
           rustup default 1.85
+          echo "--- which ---"
+          which cargo && which rustc
+          echo "--- versions ---"
+          rustc --version && cargo --version
           rustup show
-          cargo --version
 
-      # Cache ~/.cargo/bin (avm + anchor binaries) keyed on version string.
-      # Cache hit → both tools ready in <5 s. Miss → compile once, cached thereafter.
       - name: Cache Cargo bin (avm / anchor)
         id: cache-cargo-bin
         uses: actions/cache@v4
@@ -105,6 +110,8 @@ jobs:
     needs: build-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: "1.85"
     steps:
       - uses: actions/checkout@v4
 
@@ -113,8 +120,9 @@ jobs:
         with:
           toolchain: "1.85"
 
-      - name: Set Rust 1.85 as global default
+      - name: Force rustup proxy in PATH
         run: |
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           rustup default 1.85
           cargo --version
 
