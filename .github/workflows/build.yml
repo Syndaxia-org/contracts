@@ -9,6 +9,7 @@ on:
 env:
   ANCHOR_VERSION: "0.32.1"
   SOLANA_VERSION: "2.2.14"   # anza.xyz stable — matches SBF toolchain used in verifiable build
+  RUST_VERSION: "1.85"
 
 jobs:
   # ───────────────────────────────────────────────────────────────────
@@ -22,7 +23,10 @@ jobs:
       - name: Install Rust (≥1.85 — edition2024 support)
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.85"
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Set Rust default toolchain
+        run: rustup default ${{ env.RUST_VERSION }} && cargo --version
 
       # Cache ~/.cargo/bin (avm + anchor binaries) keyed on version string.
       # Cache hit → both tools ready in <5 s. Miss → compile once, cached thereafter.
@@ -31,7 +35,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin
-          key: cargo-bin-avm-anchor-${{ env.ANCHOR_VERSION }}-${{ runner.os }}
+          key: cargo-bin-avm-anchor-${{ env.ANCHOR_VERSION }}-rust-${{ env.RUST_VERSION }}-${{ runner.os }}
 
       # Cache registry + build artefacts separately (changes with Cargo.lock)
       - name: Cache Cargo registry & build
@@ -102,14 +106,17 @@ jobs:
       - name: Install Rust (≥1.85 — edition2024 support)
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.85"
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Set Rust default toolchain
+        run: rustup default ${{ env.RUST_VERSION }} && cargo --version
 
       - name: Cache Cargo bin (solana-verify)
         id: cache-sv-bin
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin
-          key: cargo-bin-solana-verify-${{ runner.os }}
+          key: cargo-bin-solana-verify-rust-${{ env.RUST_VERSION }}-${{ runner.os }}
 
       - name: Install solana-verify CLI
         if: steps.cache-sv-bin.outputs.cache-hit != 'true'
