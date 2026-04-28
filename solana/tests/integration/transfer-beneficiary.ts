@@ -100,4 +100,33 @@ describe("transfer_beneficiary", () => {
       expect(err.error?.errorCode?.code || err.toString()).to.contain("BeneficiaryEqualsBuyer");
     }
   });
+
+  // ── C-MED-3: transfer_beneficiary frozen during Disputed ────────────────────
+  it("rejects transfer_beneficiary while deal is Disputed", async () => {
+    const newBeneficiary = Keypair.generate();
+    const dealKeypair = await createTestDeal({
+      ...ctx, buyer, seller, buyerTokenAccount, treasuryConfigPda, treasuryTokenAccount,
+      disputeDelay: new anchor.BN(0),
+    });
+
+    // Open a dispute (status -> Disputed)
+    await ctx.program.methods
+      .dispute()
+      .accounts({ deal: dealKeypair.publicKey, authority: buyer.publicKey })
+      .signers([buyer])
+      .rpc();
+
+    // Beneficiary transfer must be rejected — protects the validator's
+    // arbitration target from being substituted post-decision.
+    try {
+      await ctx.program.methods
+        .transferBeneficiary(newBeneficiary.publicKey)
+        .accounts({ deal: dealKeypair.publicKey, beneficiary: seller.publicKey })
+        .signers([seller])
+        .rpc();
+      expect.fail("Should have thrown NotEligible");
+    } catch (err: any) {
+      expect(err.error?.errorCode?.code || err.toString()).to.contain("NotEligible");
+    }
+  });
 });

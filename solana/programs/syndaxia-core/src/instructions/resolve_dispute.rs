@@ -42,6 +42,15 @@ pub fn handler(
         deal.status == Status::Disputed,
         SyndaxiaError::NotDisputed
     );
+    // Validator must resolve before the dispute deadline elapses. After the
+    // deadline, the deal becomes expirable (refund-buyer) and the validator
+    // can no longer impose a split — protects the buyer's SLA guarantee.
+    let now = Clock::get()?.unix_timestamp;
+    let deadline = deal
+        .disputed_at
+        .checked_add(deal.dispute_resolution_window)
+        .ok_or(SyndaxiaError::MathOverflow)?;
+    require!(now < deadline, SyndaxiaError::DisputeExpired);
     // Shares must sum to the amount still held in escrow (accounts for partial milestone releases).
     let remaining = deal.remaining_escrow_amount().map_err(|_| SyndaxiaError::MathOverflow)?;
     let total = buyer_share

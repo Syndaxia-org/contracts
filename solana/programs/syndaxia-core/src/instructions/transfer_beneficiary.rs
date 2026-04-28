@@ -38,10 +38,10 @@ pub fn handler(ctx: Context<TransferBeneficiary>, new_beneficiary: Pubkey) -> Re
         ctx.accounts.beneficiary.key() == deal.beneficiary,
         SyndaxiaError::Unauthorized
     );
-    require!(
-        deal.status == Status::Open || deal.status == Status::Disputed,
-        SyndaxiaError::NotEligible
-    );
+    // Only allowed in Open state. Disputed deals are frozen so that the
+    // validator's arbitration target (deal.beneficiary) cannot be substituted
+    // between the time of the off-chain decision and the on-chain settlement.
+    require!(deal.status == Status::Open, SyndaxiaError::NotEligible);
     require!(
         new_beneficiary != deal.buyer,
         SyndaxiaError::BeneficiaryEqualsBuyer

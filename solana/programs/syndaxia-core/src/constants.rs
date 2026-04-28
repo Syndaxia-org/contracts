@@ -36,14 +36,22 @@ pub const MAX_TIMEOUT: i64 = 365 * 24 * 3600;
 /// Maximum allowed dispute delay in seconds (365 days).
 pub const MAX_DISPUTE_DELAY: i64 = 365 * 24 * 3600;
 
-/// Minimum dispute resolution window per deal (1 day).
-pub const MIN_DISPUTE_RESOLUTION_WINDOW: i64 = 24 * 3600;
+/// Minimum dispute resolution window per deal (7 days).
+/// Hard floor to prevent buyer-side griefing where a malicious buyer would set
+/// an unreasonably short window forcing the validator to either rush an
+/// arbitration or let the deal expire (refund-buyer).
+pub const MIN_DISPUTE_RESOLUTION_WINDOW: i64 = 7 * 24 * 3600;
 
 /// Maximum dispute resolution window per deal (365 days).
 pub const MAX_DISPUTE_RESOLUTION_WINDOW: i64 = 365 * 24 * 3600;
 
 /// Maximum number of times the validator can extend a dispute resolution window.
-pub const MAX_DISPUTE_EXTENSIONS: u8 = 2;
+///
+/// Each extension DOUBLES the remaining window (capped at
+/// `MAX_DISPUTE_RESOLUTION_WINDOW`). With a single extension, the worst-case
+/// total resolution time is `2 × initial_window`, which is sufficient for
+/// legitimate complex disputes while bounding griefing potential.
+pub const MAX_DISPUTE_EXTENSIONS: u8 = 1;
 
 /// Maximum number of milestones per deal.
 pub const MAX_MILESTONES: usize = 8;

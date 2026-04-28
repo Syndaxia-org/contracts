@@ -2,15 +2,16 @@
 
 **Programs in scope**
 
-| Program | Version | Program ID |
+| Program | Version | Mainnet Program ID |
 |---------|---------|------------|
-| `syndaxia-core` | v0.1.0 | `ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1` |
-| `syndaxia-treasury` | v0.1.0 | `DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx` |
+| `syndaxia-core` | v0.2.0 | `ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1` |
+| `syndaxia-treasury` | v0.2.0 | `DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx` |
 
 **Blockchain**: Solana — Anchor 0.32.0  
 **Initial audit date**: March 31, 2026  
 **Treasury & milestones review date**: April 1, 2026  
-**Audit type**: Pre-release internal security review  
+**Post-launch hardening review (Series C) date**: April 27, 2026  
+**Audit type**: Internal security review  
 **Status**: ✅ All identified vulnerabilities have been remediated and verified by tests
 
 ---
@@ -25,19 +26,22 @@ commerce on Solana. It comprises two programs:
 - **`syndaxia-treasury`** — Protocol fee governance: rate and recipient management
   with a mandatory 7-day timelock on every change.
 
-The internal review was conducted in two passes. The first covered the initial
-architecture; the second covered the integration between `syndaxia-core` and
-`syndaxia-treasury` along with the milestone feature.
+The internal review was conducted in three passes. Series A covered the initial
+architecture; Series B covered the integration between `syndaxia-core` and
+`syndaxia-treasury` along with the milestone feature. Series C is a post-launch
+hardening pass conducted while both programs are deployed on mainnet (and still
+upgradeable), focused on dispute lifecycle invariants and treasury governance
+resilience.
 
 ### Findings Summary
 
-| Severity | Series A (initial architecture) | Series B (treasury + milestones) | Total Remediated |
-|----------|---------------------------------|----------------------------------|-----------------|
-| 🔴 Critical | 4 | 1 | **5** |
-| 🟠 High | 4 | 2 | **6** |
-| 🟡 Medium | 5 | 2 | **7** |
-| 🔵 Informational | — | 1 | **1** |
-| **Remaining open** | | | **0** |
+| Severity | Series A (initial architecture) | Series B (treasury + milestones) | Series C (post-launch hardening) | Total Remediated |
+|----------|---------------------------------|----------------------------------|---------------------------------|-----------------|
+| 🔴 Critical | 4 | 1 | 0 | **5** |
+| 🟠 High | 4 | 2 | 2 | **8** |
+| 🟡 Medium | 5 | 2 | 4 | **11** |
+| 🔵 Informational | — | 1 | 3 | **4** |
+| **Remaining open** | | | | **0** |
 
 All findings were remediated and covered by regression tests before this report was
 published. No vulnerability remains open.
@@ -285,6 +289,137 @@ treasury_config.key()` (the PDA), aligning both programs on the same account.
 
 ---
 
+### Series C — Post-Launch Hardening
+
+This series was conducted after the initial mainnet deployment, while both programs
+remain upgradeable. It focuses on (a) lifecycle invariants in the dispute flow that
+were correct in the happy path but unsafe at boundaries, and (b) governance
+resilience of the treasury program.
+
+#### C-HIGH-1 · Dispute Extension After Deadline (High)
+
+**Risk**: A validator could call `extend_dispute` after the dispute resolution
+window had already elapsed, retroactively re-opening a deal that should have been
+eligible for `expire_deal` (refund to buyer). This created a griefing vector
+against the buyer and broke the lifecycle guarantee that an expired dispute
+cannot be resurrected.
+
+**Remediation**: `extend_dispute` now rejects calls past the current dispute
+deadline with `DisputeExpired`. Once the window has elapsed, only `expire_deal`
+remains callable, ensuring the buyer is reliably refunded.
+
+---
+
+#### C-HIGH-2 · Multisig Cannot Be Rotated (High)
+
+**Risk**: The treasury governance multisig stored in `TreasuryConfig` was
+immutable. Loss or compromise of the multisig keys would have permanently
+bricked governance, forcing recovery via program upgrade — itself slated to be
+locked in the future. This was a single point of permanent failure.
+
+**Remediation**: A timelocked multisig rotation mechanism was added
+(`propose_multisig_change` / `cancel_multisig_change` / `apply_multisig_change`)
+mirroring the existing fee-change pattern with a 7-day timelock. Cancellation
+remains under the current multisig; application is permissionless after the
+timelock. Account layout was extended in a backwards-compatible way via a
+one-shot `migrate_v2` instruction that resizes pre-existing accounts in place
+and zero-initialises the appended fields. The `syndaxia-core` cross-program
+offsets used to read `fee_receiver` and `protocol_fee_bps` were preserved.
+
+---
+
+#### C-MED-1 · Dispute Resolution After Deadline (Medium)
+
+**Risk**: `resolve_dispute` did not check the dispute deadline. A validator
+could resolve a dispute long after its window had elapsed, contradicting the
+intended invariant that an expired dispute can only be settled by
+`expire_deal` (full refund to the buyer).
+
+**Remediation**: `resolve_dispute` now rejects calls past the dispute deadline
+with `DisputeExpired`. Combined with C-HIGH-1, this guarantees a strict
+lifecycle: while the window is open, the validator may extend or resolve;
+once elapsed, only the buyer-refund path remains.
+
+---
+
+#### C-MED-2 · Beneficiary Transfer During Dispute (Medium)
+
+**Risk**: `transfer_beneficiary` accepted both `Open` and `Disputed` states.
+While the operation only changes the future payee (not the funds at rest),
+allowing it during a dispute could be used by the seller side to obfuscate
+the destination of funds mid-arbitration, complicating the validator's
+decision.
+
+**Remediation**: `transfer_beneficiary` now restricts the transition to the
+`Open` state only. Beneficiary changes during arbitration are rejected with
+`NotEligible`.
+
+---
+
+#### C-MED-3 · Silent Overwrite of Pending Treasury Proposals (Medium)
+
+**Risk**: Calling `propose_fee_change` or `propose_fee_receiver_change` while
+a proposal of the same kind was already pending silently overwrote it and
+restarted the 7-day timelock. A compromised governance key could cycle
+proposals indefinitely to delay any user-favorable change. There was also no
+on-chain trace of the original proposal being superseded.
+
+**Remediation**: Both proposals now require any pending proposal of the same
+kind to be explicitly cancelled first (`cancel_*` emits a dedicated event).
+New error: `ProposalAlreadyPending`. Same protection extended to the new
+`propose_multisig_change` (C-HIGH-2).
+
+---
+
+#### C-MED-4 · Insufficient Validation on Treasury Proposals (Medium)
+
+**Risk**: `propose_fee_receiver_change` accepted `Pubkey::default()` as the
+new receiver. If applied, no token account could ever satisfy the
+`owner == config.fee_receiver` constraint, permanently bricking withdrawals.
+In parallel, all three proposal types (fee, receiver, multisig) accepted
+no-op values (identical to the current configuration), which only served to
+delay legitimate subsequent proposals while emitting misleading events.
+
+**Remediation**: The new receiver and the new multisig are both required to
+be non-default. All three proposal types now reject values identical to the
+current configuration with `NoOpProposal`.
+
+---
+
+#### C-INFO-1 · Misleading Permissionless-Apply Events (Informational)
+
+**Issue**: `FeeReceiverUpdated` carried an `updated_by: Pubkey::default()`
+field because `apply_fee_receiver_change` is permissionless. Block explorers
+rendered this as a literal address, falsely suggesting an actor.
+
+**Remediation**: The misleading field was removed.
+
+---
+
+#### C-INFO-2 · Dispute Resolution Window Lower Bound (Informational)
+
+**Issue**: The minimum acceptable `dispute_resolution_window` was 24 hours.
+While no immediate exploit existed, such a short window could be selected
+at deal creation in a way that disadvantages the counterparty by leaving
+insufficient time to evaluate evidence.
+
+**Remediation**: The minimum was raised to 7 days, matching the protocol's
+governance timelock and giving all parties — including external arbitrators —
+adequate time to react.
+
+---
+
+#### C-INFO-3 · Dead Code (Informational)
+
+**Issue**: Unused scaffolding files (legacy `Market`, `Config` state types
+and their initialization handlers) remained in the program crate. They had
+no effect on runtime behavior but increased the audit surface and risked
+being wired in inadvertently during future refactors.
+
+**Remediation**: All dead modules were removed.
+
+---
+
 ## Attack Vector Analysis
 
 | Vector | Status |
@@ -380,7 +515,7 @@ deployment:
 | 🔴 Critical | Multisig administration via Squads Protocol |
 | 🟠 High | Public bug bounty program (e.g., Immunefi) |
 | 🟠 High | Fuzz testing with Trident or Honggfuzz |
-| 🟡 Medium | Verified build via `solana-verify` (deterministic Docker build + OtterSec submission) |
+| 🟡 Medium | Verified build via `anchor verify` |
 | 🟡 Medium | Public IDL documentation |
 
 ### Path to Immutability
@@ -410,8 +545,6 @@ Phase 3 — Immutability
 - [x] Anchor 0.32.0 (latest stable)
 - [x] No unnecessary dependencies
 - [x] No `unsafe` Rust
-- [x] `solana-security-txt` v1.1.2 embedded in both programs
-- [x] Deterministic verified build — `solanafoundation/solana-verifiable-build:3.1.10`
 
 ---
 

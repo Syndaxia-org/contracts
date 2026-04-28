@@ -27,10 +27,15 @@ pub struct TreasuryConfig {
     pub receiver_timelock_until: i64,
     /// PDA bump seed.
     pub bump: u8,
+    /// Pending multisig rotation (None if no proposal active). Appended after `bump`
+    /// for layout-compat with v1 accounts; populated only after `migrate_v2`.
+    pub pending_multisig: Option<Pubkey>,
+    /// Unix timestamp after which the pending multisig rotation can be applied.
+    pub multisig_timelock_until: i64,
 }
 
 impl TreasuryConfig {
-    /// Account space:
+    /// V1 account space (pre multisig-rotation upgrade).
     /// 8 discriminator
     /// + 32 multisig
     /// + 32 fee_receiver
@@ -40,5 +45,10 @@ impl TreasuryConfig {
     /// + 33 pending_fee_receiver (Option<Pubkey> = 1 tag + 32 data)
     /// + 8  receiver_timelock_until
     /// + 1  bump
-    pub const SPACE: usize = 8 + 32 + 32 + 8 + 9 + 8 + 33 + 8 + 1;
+    pub const SPACE_V1: usize = 8 + 32 + 32 + 8 + 9 + 8 + 33 + 8 + 1;
+
+    /// V2 account space (adds pending_multisig + multisig_timelock_until).
+    /// + 33 pending_multisig (Option<Pubkey>)
+    /// + 8  multisig_timelock_until
+    pub const SPACE: usize = Self::SPACE_V1 + 33 + 8;
 }

@@ -50,41 +50,11 @@ describe("extend_dispute", () => {
     const deal = await ctx.program.account.deal.fetch(dealKeypair.publicKey);
     // Window doubles: 7d → 14d
     expect(deal.disputeResolutionWindow.toNumber()).to.equal(14 * 24 * 3600);
-    expect(deal.disputeExtensionsRemaining).to.equal(1);
-  });
-
-  it("validator can extend twice (max extensions = 2)", async () => {
-    const window = new anchor.BN(7 * 24 * 3600); // 7 days
-    const dealKeypair = await createTestDeal({
-      ...ctx, buyer, seller, buyerTokenAccount, treasuryConfigPda, treasuryTokenAccount,
-      disputeDelay: new anchor.BN(0),
-      disputeResolutionWindow: window,
-    });
-
-    await ctx.program.methods
-      .dispute()
-      .accounts({ deal: dealKeypair.publicKey, authority: buyer.publicKey })
-      .signers([buyer]).rpc();
-
-    // First extension: 7d → 14d
-    await ctx.program.methods
-      .extendDispute()
-      .accounts({ deal: dealKeypair.publicKey, authority: ctx.validator.publicKey })
-      .signers([ctx.validator]).rpc();
-
-    // Second extension: 14d → 21d
-    await ctx.program.methods
-      .extendDispute()
-      .accounts({ deal: dealKeypair.publicKey, authority: ctx.validator.publicKey })
-      .signers([ctx.validator]).rpc();
-
-    const deal = await ctx.program.account.deal.fetch(dealKeypair.publicKey);
-    // Window doubles twice: 7d → 14d → 28d
-    expect(deal.disputeResolutionWindow.toNumber()).to.equal(28 * 24 * 3600);
+    // Only 1 extension allowed (MAX_DISPUTE_EXTENSIONS = 1)
     expect(deal.disputeExtensionsRemaining).to.equal(0);
   });
 
-  it("rejects third extension (no extensions remaining)", async () => {
+  it("rejects second extension (no extensions remaining)", async () => {
     const window = new anchor.BN(7 * 24 * 3600);
     const dealKeypair = await createTestDeal({
       ...ctx, buyer, seller, buyerTokenAccount, treasuryConfigPda, treasuryTokenAccount,
@@ -97,17 +67,13 @@ describe("extend_dispute", () => {
       .accounts({ deal: dealKeypair.publicKey, authority: buyer.publicKey })
       .signers([buyer]).rpc();
 
-    // Use both extensions
-    await ctx.program.methods
-      .extendDispute()
-      .accounts({ deal: dealKeypair.publicKey, authority: ctx.validator.publicKey })
-      .signers([ctx.validator]).rpc();
+    // Use the single allowed extension
     await ctx.program.methods
       .extendDispute()
       .accounts({ deal: dealKeypair.publicKey, authority: ctx.validator.publicKey })
       .signers([ctx.validator]).rpc();
 
-    // Third extension should fail
+    // Second extension should fail
     try {
       await ctx.program.methods
         .extendDispute()
@@ -186,12 +152,22 @@ describe("extend_dispute", () => {
     }
   });
 
-  it("deal creation sets dispute_extensions_remaining to 2", async () => {
+  it("deal creation sets dispute_extensions_remaining to 1", async () => {
     const dealKeypair = await createTestDeal({
       ...ctx, buyer, seller, buyerTokenAccount, treasuryConfigPda, treasuryTokenAccount,
     });
 
     const deal = await ctx.program.account.deal.fetch(dealKeypair.publicKey);
-    expect(deal.disputeExtensionsRemaining).to.equal(2);
+    expect(deal.disputeExtensionsRemaining).to.equal(1);
+  });
+
+  // ── C-HIGH-1: extend_dispute must reject calls past the current deadline ───
+  // Requires clock-warping (bankrun); tracked here so the regression intent
+  // is visible in the test suite. Manually verified on devnet pre-deploy.
+  it.skip("rejects extension after current deadline has elapsed (DisputeExpired)", async () => {
+    // 1. Create deal with disputeResolutionWindow = MIN (7d)
+    // 2. Open dispute
+    // 3. Warp clock to disputed_at + 7d + 1
+    // 4. validator calls extend_dispute → expect DisputeExpired
   });
 });

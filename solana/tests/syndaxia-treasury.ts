@@ -232,35 +232,38 @@ describe("syndaxia-treasury", () => {
   });
 
   // ─────────────────────────────────────────────────────────
-  // 5. UPDATE FEE RECEIVER
+  // 5. UPDATE FEE RECEIVER (timelocked)
   // ─────────────────────────────────────────────────────────
-  describe("update_fee_receiver", () => {
-    it("updates the fee receiver address", async () => {
+  describe("propose_fee_receiver_change", () => {
+    it("proposes a new fee receiver and sets timelock", async () => {
       const newReceiver = Keypair.generate();
       await program.methods
-        .updateFeeReceiver(newReceiver.publicKey)
+        .proposeFeeReceiverChange(newReceiver.publicKey)
         .accounts({ multisig: multisig.publicKey })
         .signers([multisig])
         .rpc();
 
       const config = await program.account.treasuryConfig.fetch(configPda);
-      expect(config.feeReceiver.toBase58()).to.equal(newReceiver.publicKey.toBase58());
+      expect(config.pendingFeeReceiver).to.not.be.null;
+      expect(config.pendingFeeReceiver!.toBase58()).to.equal(newReceiver.publicKey.toBase58());
+      // active receiver unchanged
+      expect(config.feeReceiver.toBase58()).to.equal(feeReceiver.publicKey.toBase58());
 
-      // Restore original fee_receiver for subsequent tests
+      // Cleanup for subsequent tests
       await program.methods
-        .updateFeeReceiver(feeReceiver.publicKey)
+        .cancelFeeReceiverChange()
         .accounts({ multisig: multisig.publicKey })
         .signers([multisig])
         .rpc();
     });
 
-    it("rejects update from non-multisig", async () => {
+    it("rejects proposal from non-multisig", async () => {
       const rogue = Keypair.generate();
       const sig = await provider.connection.requestAirdrop(rogue.publicKey, anchor.web3.LAMPORTS_PER_SOL);
       await provider.connection.confirmTransaction(sig);
       try {
         await program.methods
-          .updateFeeReceiver(rogue.publicKey)
+          .proposeFeeReceiverChange(rogue.publicKey)
           .accounts({ multisig: rogue.publicKey })
           .signers([rogue])
           .rpc();
@@ -280,6 +283,199 @@ describe("syndaxia-treasury", () => {
   describe.skip("withdraw", () => {
     it("placeholder", () => {
       // Skipped - tested via core
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // 7. SECURITY PATCHES (Series B treasury hardening)
+  // ─────────────────────────────────────────────────────────
+  describe("security patches", () => {
+    // ── T-MED-1: cannot overwrite a pending proposal ──────────────────────
+    it("T-MED-1: rejects propose_fee_change while one is pending", async () => {
+      await program.methods
+        .proposeFeeChange(new anchor.BN(7))
+        .accounts({ multisig: multisig.publicKey })
+        .signers([multisig])
+        .rpc();
+      try {
+        await program.methods
+          .proposeFeeChange(new anchor.BN(9))
+          .accounts({ multisig: multisig.publicKey })
+          .signers([multisig])
+          .rpc();
+        expect.fail("should have thrown ProposalAlreadyPending");
+      } catch (e: any) {
+        expect(e.message).to.include("ProposalAlreadyPending");
+      } finally {
+        await program.methods
+          .cancelFeeChange()
+          .accounts({ multisig: multisig.publicKey })
+          .signers([multisig])
+          .rpc();
+      }
+    });
+
+    it("T-MED-1: rejects propose_fee_receiver_change while one is pending", async () => {
+      const r1 = Keypair.generate();
+      const r2 = Keypair.generate();
+      await program.methods
+        .proposeFeeReceiverChange(r1.publicKey)
+        .accounts({ multisig: multisig.publicKey })
+        .signers([multisig])
+        .rpc();
+      try {
+        await program.methods
+          .proposeFeeReceiverChange(r2.publicKey)
+          .accounts({ multisig: multisig.publicKey })
+          .signers([multisig])
+          .rpc();
+        expect.fail("should have thrown ProposalAlreadyPending");
+      } catch (e: any) {
+        expect(e.message).to.include("ProposalAlreadyPending");
+      } finally {
+        await program.methods
+          .cancelFeeReceiverChange()
+          .accounts({ multisig: multisig.publicKey })
+          .signers([multisig])
+          .rpc();
+      }
+    });
+
+    // ── T-MED-2: validate new fee receiver ─────────────────────────────────
+    it("T-MED-2: rejects propose_fee_receiver_change with default pubkey", async () => {
+      try {
+        await program.methods
+          .proposeFeeReceiverChange(PublicKey.default)
+          .accounts({ multisig: multisig.publicKey })
+          .signers([multisig])
+          .rpc();
+        expect.fail("should have thrown InvalidFeeReceiver");
+      } catch (e: any) {
+        expect(e.message).to.include("InvalidFeeReceiver");
+      }
+    });
+
+    // ── T-MED-3: no-op proposals rejected ──────────────────────────────────
+    it("T-MED-3: rejects propose_fee_change equal to current fee", async () => {
+      const cfg = await program.account.treasuryConfig.fetch(configPda);
+      try {
+        await program.methods
+          .proposeFeeChange(cfg.protocolFeeBps)
+          .accounts({ multisig: multisig.publicKey })
+          .signers([multisig])
+          .rpc();
+        expect.fail("should have thrown NoOpProposal");
+      } catch (e: any) {
+        expect(e.message).to.include("NoOpProposal");
+      }
+    });
+
+    it("T-MED-3: rejects propose_fee_receiver_change equal to current receiver", async () => {
+      const cfg = await program.account.treasuryConfig.fetch(configPda);
+      try {
+        await program.methods
+          .proposeFeeReceiverChange(cfg.feeReceiver)
+          .accounts({ multisig: multisig.publicKey })
+          .signers([multisig])
+          .rpc();
+        expect.fail("should have thrown NoOpProposal");
+      } catch (e: any) {
+        expect(e.message).to.include("NoOpProposal");
+      }
+    });
+
+    // ── T-HIGH-1: multisig rotation ────────────────────────────────────────
+    it("T-HIGH-1: proposes a multisig rotation and sets timelock", async () => {
+      const newMs = Keypair.generate();
+      await program.methods
+        .proposeMultisigChange(newMs.publicKey)
+        .accounts({ multisig: multisig.publicKey })
+        .signers([multisig])
+        .rpc();
+
+      const cfg = await program.account.treasuryConfig.fetch(configPda);
+      expect(cfg.pendingMultisig).to.not.be.null;
+      expect(cfg.pendingMultisig!.toBase58()).to.equal(newMs.publicKey.toBase58());
+      const now = Math.floor(Date.now() / 1000);
+      expect(cfg.multisigTimelockUntil.toNumber()).to.be.greaterThan(now + 6 * 24 * 3600);
+      // active multisig unchanged
+      expect(cfg.multisig.toBase58()).to.equal(multisig.publicKey.toBase58());
+    });
+
+    it("T-HIGH-1: rejects second multisig proposal while one is pending", async () => {
+      const newMs = Keypair.generate();
+      try {
+        await program.methods
+          .proposeMultisigChange(newMs.publicKey)
+          .accounts({ multisig: multisig.publicKey })
+          .signers([multisig])
+          .rpc();
+        expect.fail("should have thrown ProposalAlreadyPending");
+      } catch (e: any) {
+        expect(e.message).to.include("ProposalAlreadyPending");
+      }
+    });
+
+    it("T-HIGH-1: cancels a pending multisig rotation", async () => {
+      await program.methods
+        .cancelMultisigChange()
+        .accounts({ multisig: multisig.publicKey })
+        .signers([multisig])
+        .rpc();
+      const cfg = await program.account.treasuryConfig.fetch(configPda);
+      expect(cfg.pendingMultisig).to.be.null;
+      expect(cfg.multisigTimelockUntil.toNumber()).to.equal(0);
+    });
+
+    it("T-HIGH-1: rejects propose_multisig_change with default pubkey", async () => {
+      try {
+        await program.methods
+          .proposeMultisigChange(PublicKey.default)
+          .accounts({ multisig: multisig.publicKey })
+          .signers([multisig])
+          .rpc();
+        expect.fail("should have thrown InvalidMultisig");
+      } catch (e: any) {
+        expect(e.message).to.include("InvalidMultisig");
+      }
+    });
+
+    it("T-HIGH-1: rejects propose_multisig_change equal to current multisig", async () => {
+      try {
+        await program.methods
+          .proposeMultisigChange(multisig.publicKey)
+          .accounts({ multisig: multisig.publicKey })
+          .signers([multisig])
+          .rpc();
+        expect.fail("should have thrown NoOpProposal");
+      } catch (e: any) {
+        expect(e.message).to.include("NoOpProposal");
+      }
+    });
+
+    it("T-HIGH-1: rejects propose_multisig_change from non-multisig", async () => {
+      const rogue = Keypair.generate();
+      const sig = await provider.connection.requestAirdrop(rogue.publicKey, anchor.web3.LAMPORTS_PER_SOL);
+      await provider.connection.confirmTransaction(sig);
+      const target = Keypair.generate();
+      try {
+        await program.methods
+          .proposeMultisigChange(target.publicKey)
+          .accounts({ multisig: rogue.publicKey })
+          .signers([rogue])
+          .rpc();
+        expect.fail("should have thrown Unauthorized");
+      } catch (e: any) {
+        expect(e.message).to.include("Unauthorized");
+      }
+    });
+
+    // Apply paths require clock advancement (bankrun); tracked here for completeness.
+    it.skip("T-HIGH-1: applies multisig rotation after timelock (requires bankrun)", async () => {
+      // 1. Propose new multisig
+      // 2. Warp clock to timelock_until + 1
+      // 3. Call applyMultisigChange (permissionless)
+      // 4. Assert config.multisig === new multisig
     });
   });
 });

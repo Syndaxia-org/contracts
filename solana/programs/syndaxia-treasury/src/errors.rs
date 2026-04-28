@@ -23,4 +23,14 @@ pub enum TreasuryError {
     InvalidFeeReceiver,
     #[msg("No pending fee receiver change proposal to apply or cancel.")]
     NoPendingReceiverProposal,
+    #[msg("A proposal of this kind is already pending; cancel it first.")]
+    ProposalAlreadyPending,
+    #[msg("Proposed value is identical to the current configuration (no-op).")]
+    NoOpProposal,
+    #[msg("Multisig pubkey cannot be the default (zero) key.")]
+    InvalidMultisig,
+    #[msg("No pending multisig change proposal to apply or cancel.")]
+    NoPendingMultisigProposal,
+    #[msg("Account has already been migrated to v2 layout.")]
+    AlreadyMigrated,
 }

@@ -95,4 +95,6 @@ pub enum SyndaxiaError {
     NoExtensionsRemaining,
     #[msg("Total dispute resolution time would exceed the maximum allowed.")]
     DisputeExtensionTooLong,
+    #[msg("Dispute resolution window has already expired.")]
+    DisputeExpired,
 }

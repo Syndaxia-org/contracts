@@ -70,6 +70,8 @@ pub mod syndaxia_treasury {
         config.pending_fee_receiver = None;
         config.receiver_timelock_until = 0;
         config.bump = ctx.bumps.config;
+        config.pending_multisig = None;
+        config.multisig_timelock_until = 0;
 
         emit!(TreasuryInitialized {
             multisig: config.multisig,
@@ -84,6 +86,16 @@ pub mod syndaxia_treasury {
     /// Only the multisig can call this.
     pub fn propose_fee_change(ctx: Context<GovernanceAction>, new_fee_bps: u64) -> Result<()> {
         require!(new_fee_bps <= MAX_PROTOCOL_FEE_BPS, TreasuryError::FeeTooHigh);
+        // T-MED-1: cannot overwrite a pending proposal silently.
+        require!(
+            ctx.accounts.config.pending_fee_bps.is_none(),
+            TreasuryError::ProposalAlreadyPending
+        );
+        // T-MED-3: no-op proposal would only delay future legitimate changes.
+        require!(
+            new_fee_bps != ctx.accounts.config.protocol_fee_bps,
+            TreasuryError::NoOpProposal
+        );
 
         let config = &mut ctx.accounts.config;
         let now = Clock::get()?.unix_timestamp;
@@ -138,6 +150,18 @@ pub mod syndaxia_treasury {
     /// Update the fee receiver token account. Only the multisig can call this.
     /// Starts a 7-day timelock — use `apply_fee_receiver_change` after the delay.
     pub fn propose_fee_receiver_change(ctx: Context<GovernanceAction>, new_fee_receiver: Pubkey) -> Result<()> {
+        // T-MED-2: reject default / current receiver to avoid bricking withdrawals.
+        require!(new_fee_receiver != Pubkey::default(), TreasuryError::InvalidFeeReceiver);
+        require!(
+            new_fee_receiver != ctx.accounts.config.fee_receiver,
+            TreasuryError::NoOpProposal
+        );
+        // T-MED-1: cannot overwrite a pending proposal silently.
+        require!(
+            ctx.accounts.config.pending_fee_receiver.is_none(),
+            TreasuryError::ProposalAlreadyPending
+        );
+
         let config = &mut ctx.accounts.config;
         let now = Clock::get()?.unix_timestamp;
         config.pending_fee_receiver = Some(new_fee_receiver);
@@ -180,10 +204,10 @@ pub mod syndaxia_treasury {
         config.pending_fee_receiver = None;
         config.receiver_timelock_until = 0;
 
+        // T-INFO-1: drop misleading `updated_by` (apply is permissionless).
         emit!(FeeReceiverUpdated {
             old_receiver: old,
             new_receiver: pending,
-            updated_by: Pubkey::default(), // permissionless
         });
 
         Ok(())
@@ -216,6 +240,106 @@ pub mod syndaxia_treasury {
             by: ctx.accounts.multisig.key(),
         });
 
+        Ok(())
+    }
+
+    // ── T-HIGH-1: multisig rotation (timelocked) ──────────────────────────
+
+    /// Propose a new multisig (governance key rotation). Starts the 7-day timelock.
+    pub fn propose_multisig_change(ctx: Context<GovernanceAction>, new_multisig: Pubkey) -> Result<()> {
+        require!(new_multisig != Pubkey::default(), TreasuryError::InvalidMultisig);
+        require!(
+            new_multisig != ctx.accounts.config.multisig,
+            TreasuryError::NoOpProposal
+        );
+        require!(
+            ctx.accounts.config.pending_multisig.is_none(),
+            TreasuryError::ProposalAlreadyPending
+        );
+
+        let config = &mut ctx.accounts.config;
+        let now = Clock::get()?.unix_timestamp;
+        config.pending_multisig = Some(new_multisig);
+        config.multisig_timelock_until = now
+            .checked_add(FEE_CHANGE_TIMELOCK)
+            .ok_or(TreasuryError::MathOverflow)?;
+
+        emit!(MultisigChangeProposed {
+            proposed_by: ctx.accounts.multisig.key(),
+            new_multisig,
+            executable_after: config.multisig_timelock_until,
+        });
+        Ok(())
+    }
+
+    /// Cancel a pending multisig rotation. Only the (current) multisig can cancel.
+    pub fn cancel_multisig_change(ctx: Context<GovernanceAction>) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        require!(config.pending_multisig.is_some(), TreasuryError::NoPendingMultisigProposal);
+        config.pending_multisig = None;
+        config.multisig_timelock_until = 0;
+
+        emit!(MultisigChangeCancelled {
+            cancelled_by: ctx.accounts.multisig.key(),
+        });
+        Ok(())
+    }
+
+    /// Apply a pending multisig rotation after the timelock. Permissionless.
+    pub fn apply_multisig_change(ctx: Context<ApplyFeeChange>) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        let pending = config.pending_multisig.ok_or(TreasuryError::NoPendingMultisigProposal)?;
+        let now = Clock::get()?.unix_timestamp;
+        require!(now >= config.multisig_timelock_until, TreasuryError::TimelockNotElapsed);
+
+        let old = config.multisig;
+        config.multisig = pending;
+        config.pending_multisig = None;
+        config.multisig_timelock_until = 0;
+
+        emit!(MultisigRotated { old_multisig: old, new_multisig: pending });
+        Ok(())
+    }
+
+    /// One-shot migration of v1 accounts to v2 layout (adds pending_multisig fields).
+    /// Idempotent: safe to call once. Caller (any signer) pays the rent delta.
+    /// Must be the FIRST instruction called against the upgraded program for any
+    /// pre-existing v1 account, otherwise normal deserialize will fail.
+    pub fn migrate_v2(ctx: Context<MigrateV2>) -> Result<()> {
+        let config_ai = &ctx.accounts.config;
+        let cur_len = config_ai.data_len();
+        require!(cur_len == TreasuryConfig::SPACE_V1, TreasuryError::AlreadyMigrated);
+
+        // Realloc the account to V2 size and zero-init the appended bytes.
+        let new_len = TreasuryConfig::SPACE;
+        let rent = Rent::get()?;
+        let new_minimum = rent.minimum_balance(new_len);
+        let lamports_needed = new_minimum.saturating_sub(config_ai.lamports());
+        if lamports_needed > 0 {
+            anchor_lang::system_program::transfer(
+                CpiContext::new(
+                    ctx.accounts.system_program.to_account_info(),
+                    anchor_lang::system_program::Transfer {
+                        from: ctx.accounts.payer.to_account_info(),
+                        to: config_ai.to_account_info(),
+                    },
+                ),
+                lamports_needed,
+            )?;
+        }
+        config_ai.to_account_info().resize(new_len)?;
+        // Explicitly zero the appended bytes (Option<Pubkey>=None tag 0, i64=0).
+        {
+            let info = config_ai.to_account_info();
+            let mut data = info.try_borrow_mut_data()?;
+            for byte in data[cur_len..new_len].iter_mut() {
+                *byte = 0;
+            }
+        }
+
+        // Appended bytes are zero → Option<Pubkey>=None (tag 0), i64=0. Already correct.
+
+        emit!(ConfigMigratedV2 { config: config_ai.key() });
         Ok(())
     }
 }
@@ -284,6 +408,21 @@ pub struct Withdraw<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+#[derive(Accounts)]
+pub struct MigrateV2<'info> {
+    /// Config account (raw — may still be v1 layout). Verified by seeds.
+    /// CHECK: validated via PDA seeds; written via raw realloc.
+    #[account(
+        mut,
+        seeds = [CONFIG_SEED],
+        bump,
+    )]
+    pub config: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 // ── Events ────────────────────────────────────────────────────────────────────
 
 #[event]
@@ -315,7 +454,29 @@ pub struct FeeChangeApplied {
 pub struct FeeReceiverUpdated {
     pub old_receiver: Pubkey,
     pub new_receiver: Pubkey,
-    pub updated_by: Pubkey,
+}
+
+#[event]
+pub struct MultisigChangeProposed {
+    pub proposed_by: Pubkey,
+    pub new_multisig: Pubkey,
+    pub executable_after: i64,
+}
+
+#[event]
+pub struct MultisigChangeCancelled {
+    pub cancelled_by: Pubkey,
+}
+
+#[event]
+pub struct MultisigRotated {
+    pub old_multisig: Pubkey,
+    pub new_multisig: Pubkey,
+}
+
+#[event]
+pub struct ConfigMigratedV2 {
+    pub config: Pubkey,
 }
 
 #[event]

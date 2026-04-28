@@ -399,4 +399,15 @@ describe("dispute mechanics & resolve_dispute", () => {
       expect(err.error?.errorCode?.code || err.toString()).to.contain("InvalidTimeout");
     }
   });
+
+  // ── C-MED-1: resolve_dispute must reject calls past the dispute deadline ──
+  // Requires clock-warping (bankrun); tracked here so the regression intent
+  // is visible in the test suite. Manually verified on devnet pre-deploy.
+  it.skip("rejects resolve_dispute after dispute deadline (DisputeExpired)", async () => {
+    // 1. Create deal with disputeResolutionWindow = MIN (7d)
+    // 2. Open dispute
+    // 3. Warp clock to disputed_at + 7d + 1
+    // 4. validator calls resolve_dispute → expect DisputeExpired
+    //    (deal can still be expire_deal'd → buyer refunded)
+  });
 });

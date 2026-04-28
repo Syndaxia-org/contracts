@@ -28,9 +28,15 @@ pub struct ExtendDispute<'info> {
     pub authority: Signer<'info>,
 }
 
-/// Extend the dispute resolution window by `dispute_resolution_window` seconds.
-/// Authorized: validator only. Limited by `dispute_extensions_remaining`.
-/// The total window (original + extensions) cannot exceed MAX_DISPUTE_RESOLUTION_WINDOW.
+/// Extend the dispute resolution window. Authorized: validator only.
+///
+/// Each extension DOUBLES the current `dispute_resolution_window` (capped at
+/// `MAX_DISPUTE_RESOLUTION_WINDOW`). Limited by `dispute_extensions_remaining`.
+///
+/// Security: the extension MUST be requested before the current deadline
+/// elapses. After the deadline, anyone can call `expire_deal` to refund the
+/// buyer; allowing a late extension would let the validator block that path
+/// and grief the buyer indefinitely.
 pub fn handler(ctx: Context<ExtendDispute>) -> Result<()> {
     let deal = &mut ctx.accounts.deal;
 
@@ -47,8 +53,18 @@ pub fn handler(ctx: Context<ExtendDispute>) -> Result<()> {
         SyndaxiaError::NoExtensionsRemaining
     );
 
-    // Each extension adds the original dispute_resolution_window duration.
-    // Cap: the new effective deadline cannot exceed disputed_at + MAX_DISPUTE_RESOLUTION_WINDOW.
+    // Reject extension requests issued after the current deadline has elapsed —
+    // the deal becomes expirable at that point and the validator's authority
+    // over the dispute window terminates.
+    let now = Clock::get()?.unix_timestamp;
+    let current_deadline = deal
+        .disputed_at
+        .checked_add(deal.dispute_resolution_window)
+        .ok_or(SyndaxiaError::MathOverflow)?;
+    require!(now < current_deadline, SyndaxiaError::DisputeExpired);
+
+    // Each extension doubles the current window. Cap: the new window cannot
+    // exceed MAX_DISPUTE_RESOLUTION_WINDOW.
     let new_window = deal
         .dispute_resolution_window
         .checked_add(deal.dispute_resolution_window)

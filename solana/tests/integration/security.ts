@@ -279,6 +279,55 @@ describe("security", () => {
     }
   });
 
+  // ── C-INFO-2: dispute_resolution_window minimum hardened to 7 days ─────────
+  it("rejects dispute_resolution_window < 7 days", async () => {
+    const dealKeypair = Keypair.generate();
+    const tooShort = new anchor.BN(6 * 24 * 3600); // 6 days
+    try {
+      await ctx.program.methods
+        .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, tooShort, METADATA_HASH, [])
+        .accounts({
+          deal: dealKeypair.publicKey,
+          buyer: buyer.publicKey,
+          seller: seller.publicKey,
+          validator: ctx.validator.publicKey,
+          buyerTokenAccount,
+          feeCollector: ctx.feeCollector.publicKey,
+          feeCollectorTokenAccount: ctx.feeCollectorTokenAccount,
+          treasuryTokenAccount,
+          mint: ctx.mint,
+        })
+        .signers([buyer, dealKeypair])
+        .rpc();
+      expect.fail("Should have thrown InvalidDisputeResolutionWindow");
+    } catch (err: any) {
+      expect(err.error?.errorCode?.code || err.toString()).to.contain("InvalidDisputeResolutionWindow");
+    }
+  });
+
+  it("accepts dispute_resolution_window at exactly 7 days (boundary)", async () => {
+    const dealKeypair = Keypair.generate();
+    const minWindow = new anchor.BN(7 * 24 * 3600);
+    await ctx.program.methods
+      .createDeal(DEAL_AMOUNT, FEE_BPS, RELEASE_DELAY, TIMEOUT, DISPUTE_DELAY, minWindow, METADATA_HASH, [])
+      .accounts({
+        deal: dealKeypair.publicKey,
+        buyer: buyer.publicKey,
+        seller: seller.publicKey,
+        validator: ctx.validator.publicKey,
+        buyerTokenAccount,
+        feeCollector: ctx.feeCollector.publicKey,
+        feeCollectorTokenAccount: ctx.feeCollectorTokenAccount,
+        treasuryTokenAccount,
+        mint: ctx.mint,
+      })
+      .signers([buyer, dealKeypair])
+      .rpc();
+
+    const deal = await ctx.program.account.deal.fetch(dealKeypair.publicKey);
+    expect(deal.disputeResolutionWindow.toNumber()).to.equal(7 * 24 * 3600);
+  });
+
   it("accepts deal with zero fees", async () => {
     const dealKeypair = Keypair.generate();
     await ctx.program.methods
