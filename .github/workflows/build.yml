@@ -19,8 +19,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust (stable)
+      - name: Install Rust (≥1.85 — edition2024 support)
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85"
 
       # Cache ~/.cargo/bin (avm + anchor binaries) keyed on version string.
       # Cache hit → both tools ready in <5 s. Miss → compile once, cached thereafter.
@@ -39,8 +41,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             solana/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('solana/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          key: ${{ runner.os }}-cargo-rust185-${{ hashFiles('solana/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-rust185-
 
       - name: Install Solana CLI
         run: |
@@ -88,23 +90,29 @@ jobs:
         run: anchor test --skip-build
 
   # ───────────────────────────────────────────────────────────────────
-  # 2. Verifiable build  (only on push to main — Docker required)
+  # 2. Verifiable build  (only on push to main — sequential after job 1)
   # ───────────────────────────────────────────────────────────────────
   solana-verify:
+    needs: build-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust (stable)
+      - name: Install Rust (≥1.85 — edition2024 support)
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust (verify job)
-        uses: Swatinem/rust-cache@v2
         with:
-          workspaces: solana
+          toolchain: "1.85"
+
+      - name: Cache Cargo bin (solana-verify)
+        id: cache-sv-bin
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: cargo-bin-solana-verify-${{ runner.os }}
 
       - name: Install solana-verify CLI
+        if: steps.cache-sv-bin.outputs.cache-hit != 'true'
         run: cargo install solana-verify --locked
 
       - name: Verifiable build — syndaxia-core
