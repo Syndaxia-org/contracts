@@ -39,7 +39,9 @@ jobs:
         id: cache-cargo-bin
         uses: actions/cache@v4
         with:
-          path: ~/.cargo/bin
+          path: |
+            ~/.cargo/bin
+            ~/.avm
           key: cargo-bin-avm-anchor-${{ env.ANCHOR_VERSION }}-rust185-${{ runner.os }}
 
       # Cache registry + build artefacts separately (changes with Cargo.lock)
