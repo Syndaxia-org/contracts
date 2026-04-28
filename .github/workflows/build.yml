@@ -17,6 +17,8 @@ jobs:
   # ───────────────────────────────────────────────────────────────────
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: ${{ env.RUST_VERSION }}
     steps:
       - uses: actions/checkout@v4
 
@@ -100,6 +102,8 @@ jobs:
     needs: build-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: ${{ env.RUST_VERSION }}
     steps:
       - uses: actions/checkout@v4
 
