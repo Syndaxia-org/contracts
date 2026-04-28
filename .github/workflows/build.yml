@@ -5,6 +5,8 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  release:
+    types: [created]   # verifiable build + attach artifacts to release
 
 env:
   ANCHOR_VERSION: "0.32.1"
@@ -103,11 +105,13 @@ jobs:
         run: anchor test --skip-build
 
   # ───────────────────────────────────────────────────────────────────
-  # 2. Verifiable build  (only on push to main — sequential after job 1)
+  # 2. Verifiable build + release artifacts  (only on GitHub Release)
   # ───────────────────────────────────────────────────────────────────
   solana-verify:
     needs: build-and-test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'release'
+    permissions:
+      contents: write   # required to upload assets to the release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -154,15 +158,22 @@ jobs:
           echo "=== syndaxia-treasury ==="
           sha256sum target/deploy/syndaxia_treasury.so
 
-      - name: Upload mainnet deployment artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: mainnet-programs-${{ github.sha }}
-          retention-days: 90
-          path: |
-            solana/target/deploy/syndaxia_core.so
-            solana/target/deploy/syndaxia_treasury.so
-            solana/target/idl/syndaxia_core.json
-            solana/target/idl/syndaxia_treasury.json
-            solana/target/types/syndaxia_core.ts
-            solana/target/types/syndaxia_treasury.ts
+      - name: Upload artifacts to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=${{ github.event.release.tag_name }}
+          # Rename .so with tag for clarity
+          cp solana/target/deploy/syndaxia_core.so     syndaxia_core-${TAG}.so
+          cp solana/target/deploy/syndaxia_treasury.so syndaxia_treasury-${TAG}.so
+          cp solana/target/idl/syndaxia_core.json      syndaxia_core-${TAG}.idl.json
+          cp solana/target/idl/syndaxia_treasury.json  syndaxia_treasury-${TAG}.idl.json
+          # Generate checksum file
+          sha256sum syndaxia_core-${TAG}.so syndaxia_treasury-${TAG}.so > SHA256SUMS-${TAG}.txt
+          gh release upload ${TAG} \
+            syndaxia_core-${TAG}.so \
+            syndaxia_treasury-${TAG}.so \
+            syndaxia_core-${TAG}.idl.json \
+            syndaxia_treasury-${TAG}.idl.json \
+            SHA256SUMS-${TAG}.txt \
+            --clobber
