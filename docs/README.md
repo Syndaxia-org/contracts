@@ -9,7 +9,9 @@
 | [Whitepaper](./whitepaper.md) | Vision, use cases, and economic model |
 | [Protocol](./protocol.md) | Smart contract technical reference |
 | [Architecture](./architecture.md) | Design principles and security standards |
-| [Security Audit](./SECURITY_AUDIT.md) | Internal pre-release security review (Series A + B) |
+| [Security Audit](./SECURITY_AUDIT.md) | Internal pre-release security review (Series A + B + C) |
+| [IDL — syndaxia-core](./idl-core.md) | Instructions, accounts, events and errors for the escrow program |
+| [IDL — syndaxia-treasury](./idl-treasury.md) | Instructions, accounts, events and errors for the governance program |
 
 ## Quick Links
 

@@ -11,7 +11,8 @@
 **Initial audit date**: March 31, 2026  
 **Treasury & milestones review date**: April 1, 2026  
 **Post-launch hardening review (Series C) date**: April 27, 2026  
-**Audit type**: Internal security review  
+**Automated static analysis (Sec3 X-Ray) date**: April 29, 2026  
+**Audit type**: Internal security review + automated static analysis  
 **Status**: ✅ All identified vulnerabilities have been remediated and verified by tests
 
 ---
