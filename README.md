@@ -85,10 +85,12 @@ npm run lint
 
 ## Program Details
 
-| Program | Program ID (mainnet) |
-|---------|---------------------|
-| `syndaxia-core` | `ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1` |
-| `syndaxia-treasury` | `DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx` |
+| Program | Program ID (mainnet) | Verification |
+|---------|---------------------|--------------|
+| `syndaxia-core` | `ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1` | [![Verified](https://verify.osec.io/badge/ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1)](https://verify.osec.io/status/ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1) |
+| `syndaxia-treasury` | `DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx` | [![Verified](https://verify.osec.io/badge/DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx)](https://verify.osec.io/status/DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx) |
+
+Both programs are **verified on-chain** via [OtterSec](https://osec.io) — the source code at commit [`ef22d9d`](https://github.com/Syndaxia-org/contracts/tree/ef22d9d8d5e431ea1225405393f52dd3c60f18f3) matches the deployed bytecode.
 
 **Framework**: Anchor 0.32.0  
 **Network**: Solana (localnet / devnet / mainnet)
