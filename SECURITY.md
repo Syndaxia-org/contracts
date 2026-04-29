@@ -49,26 +49,6 @@ We follow a **coordinated disclosure** process:
 
 ---
 
-## Bug Bounty
-
-A formal bug bounty programme via **Immunefi** is in preparation.  
-In the meantime, we recognize valid reports with acknowledgement and, for Critical
-and High severity findings, a discretionary reward in USDC.
-
-### Severity and Reward Guidelines
-
-| Severity | Example | Reward (indicative) |
-|---|---|---|
-| **Critical** | Unauthorized fund drain from escrow | Up to $10,000 USDC |
-| **High** | Fee bypass or redirect; denial of service on settlement | Up to $3,000 USDC |
-| **Medium** | Logic errors with limited financial impact | Up to $500 USDC |
-| **Low / Info** | Best-practice improvements, missing events | Acknowledgement |
-
-Rewards are at the sole discretion of the Syndaxia Association and subject to
-the reporter having followed this responsible disclosure policy.
-
----
-
 ## In-Scope Assets
 
 ### `syndaxia-core` — Escrow lifecycle
