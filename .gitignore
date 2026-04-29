@@ -40,3 +40,7 @@ e2e/
 *~
 .DS_Store
 Thumbs.db
+
+# Sec3 X-Ray generated files
+solana/.xray/
+solana/programs/**/*.ll
