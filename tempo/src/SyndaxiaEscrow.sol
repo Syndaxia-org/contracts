@@ -462,14 +462,17 @@ contract SyndaxiaEscrow {
         }
     }
 
-    /// Transfers tokens out of escrow. Uses transferWithMemo (Tempo TIP-20 native)
-    /// with the escrow address as memo for off-chain reconciliation. Falls back to transfer().
+    /// Transfers tokens out of escrow. Attempts transferWithMemo first (TIP-20 native,
+    /// embeds escrow address as memo for off-chain reconciliation). Falls back to transfer().
+    /// Uses a low-level call because some TIP-20 implementations return void instead of bool,
+    /// which causes ABI-decoding panics inside a try/catch.
     function _transferOut(address to, uint256 value) internal {
         bytes32 memo = bytes32(uint256(uint160(address(this))));
-        try ITIP20(address(token)).transferWithMemo(to, value, memo) returns (bool ok) {
-            if (!ok) revert TransferFailed();
-        } catch {
-            bool ok = token.transfer(to, value);
+        (bool ok, ) = address(token).call(
+            abi.encodeWithSignature("transferWithMemo(address,uint256,bytes32)", to, value, memo)
+        );
+        if (!ok) {
+            ok = token.transfer(to, value);
             if (!ok) revert TransferFailed();
         }
     }
