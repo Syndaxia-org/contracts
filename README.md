@@ -1,131 +1,166 @@
-# Syndaxia Protocol
+# Syndaxia Protocol — Contracts
 
-Syndaxia is a decentralized escrow protocol implemented for Solana. It provides a trustless, immutable infrastructure for peer-to-peer and business-to-business commerce without intermediaries. The protocol features permissionless market creation, oracle-agnostic validation, and a suite of settlement mechanisms including manual release, refunds, dispute resolution, and expiration-based recovery. Syndaxia is designed as a simple, immutable, and governance-minimized base layer enabling secure transactions with minimal operational overhead.
+Syndaxia is a **multi-chain, non-custodial escrow protocol** for P2P and B2B commerce. Funds are held in autonomous, immutable contracts — no admin, no upgrades, no custody.
 
-## Key Features
+The protocol runs on two independent chains:
 
-- **Decentralized & Non-Custodial**: Funds are held in autonomous escrow contracts, never under control of a central authority.
-- **Immutable Deal Architecture**: Each deal is autonomous and immutable; all parameters are set at creation and cannot be changed.
-- **Flexible Settlement**: Support for single-tranche releases, multi-milestone deals, and permissionless dispute resolution.
-- **Sustainable Fee Structure**: Dual-rail model with marketplace fees and governance-managed protocol fees (capped at 0.2%) that fund Association operations.
-- **Stateless Design**: No global configuration or shared state; each deal operates independently.
-- **Extensible Integration**: Simple on-chain interface allowing marketplaces, stablecoins, and validation oracles to compose freely.
+| Chain | Version | Status | Framework |
+|-------|---------|--------|-----------|
+| **Solana** | v1 | Production (mainnet) | Anchor / Rust |
+| **Tempo** | v2 | Testnet (Moderato) | Foundry / Solidity |
 
-## Dual-Rail Fee Model
+Both chains share the same core protocol semantics (deal lifecycle, fees, milestones, disputes) with adaptations specific to each execution model.
 
-Syndaxia employs a dual-fee structure that separates marketplace economics from protocol sustainability:
-
-### Marketplace Fees (`fee_bps`)
-- **Set by**: Each marketplace at deal creation
-- **Maximum**: 10% (1,000 basis points)
-- **Recipient**: Marketplace's `fee_collector` account
-- **Charged to**: Buyer, on top of the deal amount
-- **Purpose**: Marketplace revenue model (optional; can be set to 0%)
-
-### Protocol Fees (`protocol_fee_bps`)
-- **Set by**: Syndaxia Association governance via `syndaxia-treasury`
-- **Maximum**: 20 basis points (0.2% hard-capped in the core program)
-- **Recipient**: Syndaxia Treasury PDA, managed by the Association
-- **Charged to**: Buyer, cumulative with marketplace fees
-- **Current Rate**: 5 basis points (0.05%) at launch
-- **Governance**: 7-day timelock before any fee rate change takes effect
-
-## Whitepaper
-
-The protocol is described in detail in the [Syndaxia Protocol Documentation](./docs/CONTRACT.md). Additional architectural and strategic notes can be found in the [docs](./docs) directory.
+---
 
 ## Repository Structure
 
-- [`solana/programs/syndaxia-core/`](./solana/programs/syndaxia-core) — Core Solana Anchor program: escrow lifecycle, milestones, dispute resolution.
-
-- [`solana/programs/syndaxia-treasury/`](./solana/programs/syndaxia-treasury) — Treasury governance program: protocol fee rate and recipient with 7-day timelock.
-
-- [`solana/tests/`](./solana/tests) — Integration tests written in TypeScript/Mocha.
-
-- [`docs/`](./docs) — Technical documentation: [protocol reference](./docs/protocol.md), [security audit](./docs/SECURITY_AUDIT.md), [architecture guide](./docs/architecture.md), [whitepaper](./docs/whitepaper.md).
-
-## Developers
-
-### Building
-
-Requirements:
-- [Anchor](https://www.anchor-lang.com/) >= 0.32.0
-- [Rust](https://www.rust-lang.org/) >= 1.70
-- [Node.js](https://nodejs.org/) >= 18
-
-Building the program:
-
-```bash
-anchor build
+```
+contracts/
+├── solana/                        ← v1 — Solana Anchor programs
+│   └── programs/
+│       ├── syndaxia-core/         ← Escrow lifecycle (create, release, dispute…)
+│       └── syndaxia-treasury/     ← Protocol fee governance (7-day timelock)
+│
+├── tempo/                         ← v2 — Tempo EVM contracts (Foundry)
+│   └── src/
+│       ├── SyndaxiaEscrow.sol     ← Immutable escrow instance (1 per deal)
+│       ├── SyndaxiaFactory.sol    ← Deploys escrows, collects protocol fee
+│       ├── SyndaxiaGovernance.sol ← Protocol fee governance (7-day timelock)
+│       └── interfaces/
+│           └── ITIP20.sol         ← TIP-20 + transferWithMemo interface
+│
+└── docs/
+    ├── protocol.md                ← Solana protocol reference
+    ├── architecture.md            ← Solana architecture guide
+    ├── tempo/
+    │   ├── protocol.md            ← Tempo protocol reference
+    │   └── architecture.md        ← Tempo architecture guide
+    ├── whitepaper.md
+    └── SECURITY_AUDIT.md
 ```
 
-### Testing
+---
 
-Run the full test suite:
+## Solana v1
 
-```bash
-anchor test
-```
+### Overview
 
-The test suite includes integration scenarios for deal creation, settlement, disputes, and expiration. Tests run against a local Solana validator and use the treasury program as a supporting dependency.
+Two Anchor programs cooperate at runtime:
 
-### Code Quality
+- **`syndaxia-core`** — manages the full escrow lifecycle: deal creation, release, refund, milestones, dispute resolution, and expiry. The protocol fee cap (20 BPS) is hardcoded in this program.
+- **`syndaxia-treasury`** — governs the active protocol fee rate and its receiver, with a mandatory 7-day timelock on every change.
 
-Format code with Prettier:
-
-```bash
-npm run lint:fix
-```
-
-Check formatting:
-
-```bash
-npm run lint
-```
-
-## Program Details
+### Deployed Programs
 
 | Program | Program ID (mainnet) | Verification |
 |---------|---------------------|--------------|
 | `syndaxia-core` | `ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1` | [![Verified](https://verify.osec.io/badge/ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1)](https://verify.osec.io/status/ACFJxibNyTnVJVNTaYgBSi5YoFK3qy3xPqvmVmKynAC1) |
 | `syndaxia-treasury` | `DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx` | [![Verified](https://verify.osec.io/badge/DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx)](https://verify.osec.io/status/DvoZj1cKMi8DEvTxBgNEnj9Fhxx9PRAsVTEWEZ2e6YHx) |
 
-Both programs are **verified on-chain** via [OtterSec](https://osec.io) — the source code at commit [`ef22d9d`](https://github.com/Syndaxia-org/contracts/tree/ef22d9d8d5e431ea1225405393f52dd3c60f18f3) matches the deployed bytecode.
+Both programs are **verified on-chain** via [OtterSec](https://osec.io) — source at commit [`ef22d9d`](https://github.com/Syndaxia-org/contracts/tree/ef22d9d8d5e431ea1225405393f52dd3c60f18f3) matches the deployed bytecode exactly.
 
-**Framework**: Anchor 0.32.0  
-**Network**: Solana (localnet / devnet / mainnet)
+**Framework:** Anchor 0.32.0 · **Network:** Solana mainnet
 
-## Governance & Licensing
+### Build & Test (Solana)
 
-Syndaxia is governed by the **Syndaxia Association** (a French non-profit organization) with commercial rights held by **Satflows SAS**.
+Requirements: Anchor ≥ 0.32.0, Rust ≥ 1.70, Node.js ≥ 18
 
-- **Intellectual Property**: Held by Syndaxia Association; protocol is open-source.
-- **Governance Token**: $SDX (issued by the Association) governs protocol parameters and oracle selection.
-- **Tokenomics**: Utility via fee reduction, voting rights, and user rewards.
-
-## Audits
-
-Security audits and formal reviews are stored in the [`docs/SECURITY_AUDIT.md`](./docs/SECURITY_AUDIT.md) file.
-
-## License
-
-Files in this repository are publicly available under the `BUSL-1.1` license, with commercial rights reserved to **Satflows SAS** for proprietary implementations. See the [`LICENSE`](./LICENSE) file for full terms.
-
-The protocol itself (as defined in the smart contracts) is governed by the Syndaxia Association and may transition to an open-source license following the DAO's governance vote.
-
-## Additional Resources
-
-- [Protocol Reference](./docs/protocol.md)
-- [Architecture Guide](./docs/architecture.md)
-- [Whitepaper](./docs/whitepaper.md)
-- [Security Audit](./docs/SECURITY_AUDIT.md)
-- [Syndaxia Association Website](https://syndaxia.org)
-- [Support & Integration](https://satflows.fr)
-
-## Contributing
-
-Contributions are welcome. Please follow the formatting guidelines (Prettier) and submit pull requests against the main branch. Major changes should be discussed with the core team and Syndaxia Association.
+```bash
+cd solana
+anchor build   # compile both programs
+anchor test    # integration tests against local validator
+```
 
 ---
 
-**Syndaxia Protocol** © 2026 Syndaxia Association & Satflows SAS. All rights reserved.
+## Tempo v2
+
+### Overview
+
+The Tempo chain is an EVM-compatible payments-first blockchain with native fee sponsorship, TIP-20 stablecoins, and the Machine Payments Protocol (MPP) for AI agent commerce. See [`docs/tempo/protocol.md`](./docs/tempo/protocol.md) for the full protocol reference.
+
+Three contracts form the Tempo protocol:
+
+- **`SyndaxiaEscrow`** — immutable, single-use escrow. One instance per deal, deployed by the Factory. All parameters are fixed at construction as `immutable` variables (zero storage cost on Tempo).
+- **`SyndaxiaFactory`** — the permanent entry point. Buyers call `createEscrow()`, which atomically pulls funds, deploys a fresh `SyndaxiaEscrow`, and distributes fees.
+- **`SyndaxiaGovernance`** — timelocked governance for protocol fee rate and receiver, mirroring `syndaxia-treasury`. Every change requires a 7-day on-chain delay.
+
+### Key Differences from Solana v1
+
+| Feature | Solana v1 | Tempo v2 |
+|---------|-----------|----------|
+| Execution model | sBPF / Anchor (Rust) | EVM / Solidity |
+| Deal creation | 2-step: `initialize_deal` + `deposit` | Atomic: `createEscrow` (Factory) |
+| Governance | Separate `syndaxia-treasury` program | `SyndaxiaGovernance.sol` |
+| Fee governance timelock | 7 days | 7 days (identical) |
+| Payment token | SPL tokens | TIP-20 (IERC20-compatible) |
+| Beneficiary transfer | `transfer_beneficiary` | `transferBeneficiary` |
+| Native value | SOL (rent) | None — BALANCE always 0 on Tempo |
+| Storage model | Anchor PDAs (account rent) | `immutable` vars (bytecode, free) |
+| Payment memo | N/A | `transferWithMemo(to, amount, dealId)` |
+| MPP integration | N/A | Native (Machine Payments Protocol) |
+
+### Deployed Contracts (Moderato Testnet — chain ID 42431)
+
+| Contract | Address | Verification |
+|----------|---------|--------------|
+| `SyndaxiaFactory` | `0x1A33A7eDC2Ae59a92E0D955dD8100751Be99D36D` | [contracts.tempo.xyz](https://contracts.tempo.xyz) — exact_match |
+| `SyndaxiaGovernance` | TBD (pending deployment) | — |
+
+Mainnet deployment is planned following audit and testnet validation.
+
+### Build & Test (Tempo)
+
+Requirements: [Foundry nightly](https://github.com/foundry-rs/foundry) (`foundryup --nightly`), Solidity 0.8.24
+
+```bash
+cd tempo
+forge build         # compile all contracts
+forge test -vvv     # run test suite
+```
+
+Deployment to Moderato testnet:
+
+```bash
+export PRIVATE_KEY=0x...
+export GOVERNANCE=0x...
+export PROTOCOL_FEE_RECEIVER=0x...
+export PROTOCOL_FEE_BPS=10
+
+forge script script/Deploy.s.sol --rpc-url moderato --broadcast
+```
+
+---
+
+## Protocol Invariants (both chains)
+
+| Invariant | Description |
+|-----------|-------------|
+| **Fee cap** | Protocol fee hardcoded ≤ 20 BPS on both chains — not overridable by governance |
+| **No admin access to escrow** | Only deal parties can move funds; no privileged account can freeze or drain |
+| **Immutable parameters** | All deal parameters set at creation cannot be changed |
+| **Timelocked governance** | Any protocol parameter change requires a 7-day on-chain delay |
+| **No-admin policy** | Critical for AI agent commerce: no human can arbitrarily intervene in settlement |
+
+---
+
+## Governance & Licensing
+
+Syndaxia is governed by the **Syndaxia Association** (French non-profit) with commercial rights held by **Satflows SAS**.
+
+- **License:** BUSL-1.1 — Change Date 2029-01-01, Change License Apache 2.0
+- **Governance token:** $SDX — voting rights and fee reduction
+- **Security contact:** security@syndaxia.org
+
+## Security
+
+See [`SECURITY.md`](./SECURITY.md) and [`docs/SECURITY_AUDIT.md`](./docs/SECURITY_AUDIT.md).
+
+## Additional Resources
+
+- [Tempo Protocol Reference](./docs/tempo/protocol.md)
+- [Solana Protocol Reference](./docs/protocol.md)
+- [Architecture Guide](./docs/architecture.md)
+- [Whitepaper](./docs/whitepaper.md)
+- [Syndaxia Association](https://syndaxia.org)
