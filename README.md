@@ -105,8 +105,8 @@ Three contracts form the Tempo protocol:
 
 | Contract | Address | Verification |
 |----------|---------|--------------|
-| `SyndaxiaFactory` | `0x1A33A7eDC2Ae59a92E0D955dD8100751Be99D36D` | [contracts.tempo.xyz](https://contracts.tempo.xyz) — exact_match |
-| `SyndaxiaGovernance` | TBD (pending deployment) | — |
+| `SyndaxiaGovernance` | `0x4bCE516E2ad9d7bEf660eD856C3C189dF2a743E7` | [contracts.tempo.xyz](https://contracts.tempo.xyz) — exact_match |
+| `SyndaxiaFactory` | `0x73fB24e14eD6767D695dC99Ec15bf89333cae977` | [contracts.tempo.xyz](https://contracts.tempo.xyz) — exact_match |
 
 Mainnet deployment is planned following audit and testnet validation.
 
